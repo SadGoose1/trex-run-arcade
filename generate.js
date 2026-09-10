@@ -73,11 +73,15 @@ function argumentReporter(name, typename) {
   return block("argument_reporter_custom", `<mutation typename="${typename || "Sprite"}"></mutation><field name="VALUE">${name}</field>`);
 }
 
-// chain: join statement blocks with <next>
+// chain: join statement blocks with <next>. Blockly requires <next> to be a
+// child of the preceding block (before its closing tag), not a sibling.
 function chain(stmts) {
   let out = "";
   for (let i = stmts.length - 1; i >= 0; i--) {
-    out = stmts[i] + (out ? `<next>${out}</next>` : "");
+    if (!out) { out = stmts[i]; continue; }
+    const idx = stmts[i].lastIndexOf("</block>");
+    if (idx < 0) throw new Error("chain(): statement missing closing </block>");
+    out = stmts[i].slice(0, idx) + "<next>" + out + "</next>" + stmts[i].slice(idx);
   }
   return out;
 }
