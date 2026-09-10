@@ -298,6 +298,22 @@ topBlocks.push(
   ]))
 );
 
+// ---------- AUTO-JUMP (test builds only) ----------
+if (process.env.AUTOJUMP) {
+  topBlocks.push(
+    gameInterval(4000, [
+      setVarNum("vy", -200),
+      setVarBool("grounded", "FALSE"),
+      setVarBool("jumpHeld", "TRUE"),
+      stopAnims(vget("dino")),
+      setImage(vget("dino"), S.dinoJump),
+      setVel(vget("dino"), sh.speed(0), null, sh.speed(-200)),
+      block("device_pause", value("pause", sh.time(150))),
+      setVarBool("jumpHeld", "FALSE"),
+    ], 3200, 0)
+  );
+}
+
 // ---------- SCORE TICK (forever) ----------
 topBlocks.push(
   foreverLoop(
@@ -390,8 +406,6 @@ topBlocks.push(
               setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
               setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
             ],
-          ],
-          [
             [
               setVar("temp", createSprite(S.tree, "Enemy")),
               setPos(vget("temp"), 168, 90),
