@@ -110,7 +110,13 @@ bbbb00000000
 0055555555555000
 0000555555000000
 0000000000000000
-`</field></shadow></value><value name="kind"><shadow type="spritekind"><field name="MEMBER">Enemy</field></shadow></value></block></value></block>,<block type="spritesetpos" id="blk155"><value name="sprite"><shadow type="math_number"><field name="NUM">0</field></shadow><block type="variables_get" id="blk154"><field name="VAR" id="var_temp">temp</field></block></value><value name="x"><shadow type="positionPicker"><field name="index">168</field></shadow></value><value name="y"><shadow type="positionPicker"><field name="index">87</field></shadow></value></block>,<block type="run_image_animation" id="blk157"><value name="sprite"><shadow type="math_number"><field name="NUM">0</field></shadow><block type="variables_get" id="blk156"><field name="VAR" id="var_temp">temp</field></block></value><value name="frames"><shadow type="animation_editor"><field name="frames">[img`
+0000000000000000
+0000000000000000
+0000000000000000
+0000000000000000
+0000000000000000
+0000000000000000
+`</field></shadow></value><value name="kind"><shadow type="spritekind"><field name="MEMBER">Enemy</field></shadow></value></block></value></block>,<block type="spritesetpos" id="blk155"><value name="sprite"><shadow type="math_number"><field name="NUM">0</field></shadow><block type="variables_get" id="blk154"><field name="VAR" id="var_temp">temp</field></block></value><value name="x"><shadow type="positionPicker"><field name="index">168</field></shadow></value><value name="y"><shadow type="positionPicker"><field name="index">84</field></shadow></value></block>,<block type="run_image_animation" id="blk157"><value name="sprite"><shadow type="math_number"><field name="NUM">0</field></shadow><block type="variables_get" id="blk156"><field name="VAR" id="var_temp">temp</field></block></value><value name="frames"><shadow type="animation_editor"><field name="frames">[img`
 0000000000000000
 0000000055000000
 0000000555500000
@@ -120,6 +126,12 @@ bbbb00000000
 0525555555555555
 0055555555555000
 0000555555000000
+0000000000000000
+0000000000000000
+0000000000000000
+0000000000000000
+0000000000000000
+0000000000000000
 0000000000000000
 `,img`
 0000000000000000
@@ -132,6 +144,12 @@ bbbb00000000
 0055555555555000
 0000000555550000
 0000000055500000
+0000000000000000
+0000000000000000
+0000000000000000
+0000000000000000
+0000000000000000
+0000000000000000
 `]</field></shadow></value><value name="frameInterval"><shadow type="timePicker"><field name="ms">200</field></shadow></value><value name="loop"><shadow type="toggleOnOff"><field name="on">true</field></shadow></value></block>,<block type="spritesetvel" id="blk161"><value name="sprite"><shadow type="math_number"><field name="NUM">0</field></shadow><block type="variables_get" id="blk158"><field name="VAR" id="var_temp">temp</field></block></value><value name="vx"><shadow type="spriteSpeedPicker"><field name="speed">-100</field></shadow><block type="math_arithmetic" id="blk160"><field name="OP">MINUS</field><value name="A"><shadow type="math_number"><field name="NUM">0</field></shadow></value><value name="B"><shadow type="math_number"><field name="NUM">0</field></shadow><block type="variables_get" id="blk159"><field name="VAR" id="var_speed">speed</field></block></value></block></value><value name="vy"><shadow type="spriteSpeedPicker"><field name="speed">0</field></shadow></value></block>,<block type="spritesetsetflag" id="blk163"><field name="flag">SpriteFlag.AutoDestroy</field><value name="sprite"><shadow type="math_number"><field name="NUM">0</field></shadow><block type="variables_get" id="blk162"><field name="VAR" id="var_temp">temp</field></block></value><value name="on"><shadow type="toggleOnOff"><field name="on">true</field></shadow></value></block></statement></block></next></block></statement></block></statement></block><block type="gameinterval" id="blk211" x="0" y="4400"><value name="period"><shadow type="timePicker"><field name="ms">7000</field></shadow></value><statement name="HANDLER"><block type="controls_if" id="blk210"><value name="IF0"><shadow type="logic_boolean"><field name="BOOL">TRUE</field></shadow><block type="logic_operation" id="blk169"><field name="OP">AND</field><value name="A"><shadow type="logic_boolean"><field name="BOOL">TRUE</field></shadow><block type="variables_get" id="blk167"><field name="VAR" id="var_started">started</field></block></value><value name="B"><shadow type="logic_boolean"><field name="BOOL">TRUE</field></shadow><block type="percentchance" id="blk168"><value name="percentage"><shadow type="math_number_minmax"><mutation min="0" max="Infinity" label="Percentage" precision="0"></mutation><field name="SLIDER">60</field></shadow></value></block></value></block></value><statement name="DO0"><block type="variables_set" id="blk171"><field name="VAR" id="var_pick">pick</field><value name="VALUE"><shadow type="math_number"><field name="NUM">0</field></shadow><block type="device_random" id="blk170"><value name="min"><shadow type="math_number"><field name="NUM">1</field></shadow></value><value name="limit"><shadow type="math_number"><field name="NUM">3</field></shadow></value></block></value><next><block type="controls_if" id="blk209"><mutation elseif="1" else="1"></mutation><value name="IF0"><shadow type="logic_boolean"><field name="BOOL">TRUE</field></shadow><block type="logic_compare" id="blk173"><field name="OP">EQ</field><value name="A"><shadow type="math_number"><field name="NUM">0</field></shadow><block type="variables_get" id="blk172"><field name="VAR" id="var_pick">pick</field></block></value><value name="B"><shadow type="math_number"><field name="NUM">1</field></shadow></value></block></value><value name="IF1"><shadow type="logic_boolean"><field name="BOOL">TRUE</field></shadow><block type="logic_compare" id="blk175"><field name="OP">EQ</field><value name="A"><shadow type="math_number"><field name="NUM">0</field></shadow><block type="variables_get" id="blk174"><field name="VAR" id="var_pick">pick</field></block></value><value name="B"><shadow type="math_number"><field name="NUM">2</field></shadow></value></block></value><statement name="DO0"><block type="variables_set" id="blk177"><field name="VAR" id="var_temp">temp</field><value name="VALUE"><shadow type="math_number"><field name="NUM">0</field></shadow><block type="spritescreate" id="blk176"><value name="img"><shadow type="screen_image_picker"><field name="img">img`
 00060000
 00060000

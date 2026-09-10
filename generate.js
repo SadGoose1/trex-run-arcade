@@ -386,7 +386,7 @@ topBlocks.push(
         ], [
           [
             setVar("temp", createSprite(S.birdWingUp, "Enemy")),
-            setPos(vget("temp"), 168, 87),
+            setPos(vget("temp"), 168, 84),
             runAnim(vget("temp"), [S.birdWingUp, S.birdWingDown], 200, "true"),
             setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
             setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
