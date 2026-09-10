@@ -11,7 +11,7 @@ const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
 const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
-const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase"];
+const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
 plainVars.forEach((v) => (varId[v] = "var_" + v));
@@ -100,6 +100,9 @@ function setVarNum(name, n) {
 }
 function changeVar(name, delta) {
   return block("variables_change", `<field name="VAR" id="${varId[name]}">${name}</field>` + value("VALUE", sh.num(delta)));
+}
+function changeVarExpr(name, shadowXml, exprXml) {
+  return block("variables_change", `<field name="VAR" id="${varId[name]}">${name}</field>` + value("VALUE", shadowXml, exprXml));
 }
 
 // logic / math reporters
@@ -273,6 +276,8 @@ topBlocks.push(
     setVarNum("speed", 100),
     setVarNum("effSpeed", 100),
     setVarNum("vy", 0),
+    setVarNum("gravity", 20),
+    setVarBool("jumpHeld", "FALSE"),
     setVarBool("grounded", "TRUE"),
     setVarBool("ducking", "FALSE"),
     ...(NO_SPLASH ? [] : [setVarBool("started", "FALSE")]),
@@ -283,11 +288,11 @@ topBlocks.push(
     setVarBool("blinkOn", "FALSE"),
     setVar("dino", createSprite(S.dino1, "Player")),
     stayInScreen(vget("dino"), "true"),
-    setPos(vget("dino"), 24, 94),
+    setPos(vget("dino"), 24, 100),
     runAnim(vget("dino"), [S.dino1, S.dino2], 150, "true"),
     // ground line (static, never moves: kind Projectile is not swept by the tick loop)
     setVar("temp", createSprite(S.ground, "Projectile")),
-    setPos(vget("temp"), 0, 109),
+    setPos(vget("temp"), 80, 109),
     playMusic("C5 E5 G5 A5 G5 E5 C5 D5 ", 120, "music.PlaybackMode.LoopingInBackground"),
     ...(NO_SPLASH ? [] : [setVarBool("started", "TRUE")]),
   ]))
@@ -373,23 +378,35 @@ topBlocks.push(
     ifStmt([vget("started")], [
       [
         setVar("pick", random(1, 10)),
-        ifStmt([cmp("LTE", { shadow: sh.num(0), block: vget("pick") }, { shadow: sh.num(6) })], [
+        ifStmt(
+          [cmp("LTE", { shadow: sh.num(0), block: vget("pick") }, { shadow: sh.num(4) }), cmp("LTE", { shadow: sh.num(0), block: vget("pick") }, { shadow: sh.num(6) })],
           [
-            setVar("r2", random(1, 2)),
-            ifStmt([cmp("EQ", { shadow: sh.num(0), block: vget("r2") }, { shadow: sh.num(1) })], [
-              [setVar("temp", createSprite(S.cactus1, "Enemy"))],
-            ], [setVar("temp", createSprite(S.cactus2, "Enemy"))]),
-            setPos(vget("temp"), 168, 94),
+            [
+              setVar("r2", random(1, 2)),
+              ifStmt([cmp("EQ", { shadow: sh.num(0), block: vget("r2") }, { shadow: sh.num(1) })], [
+                [setVar("temp", createSprite(S.cactus1, "Enemy"))],
+              ], [setVar("temp", createSprite(S.cactus2, "Enemy"))]),
+              setPos(vget("temp"), 168, 100),
+              setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
+              setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
+            ],
+          ],
+          [
+            [
+              setVar("temp", createSprite(S.tree, "Enemy")),
+              setPos(vget("temp"), 168, 90),
+              setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
+              setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
+            ],
+          ],
+          [
+            setVar("temp", createSprite(S.birdWingUp, "Enemy")),
+            setPos(vget("temp"), 168, 88),
+            runAnim(vget("temp"), [S.birdWingUp, S.birdWingDown], 200, "true"),
             setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
             setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
-          ],
-        ], [
-          setVar("temp", createSprite(S.birdWingUp, "Enemy")),
-          setPos(vget("temp"), 168, 84),
-          runAnim(vget("temp"), [S.birdWingUp, S.birdWingDown], 200, "true"),
-          setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
-          setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
-        ]),
+          ]
+        ),
       ],
     ]),
   ], 0, 3500)
@@ -450,14 +467,22 @@ topBlocks.push(
   keyOnEvent("controller.A", "ControllerButtonEvent.Pressed", [
     ifStmt([and(vget("started"), and(vget("grounded"), not(vget("ducking"))))], [
       [
-        setVarNum("vy", -240),
+        setVarNum("vy", -200),
         setVarBool("grounded", "FALSE"),
+        setVarBool("jumpHeld", "TRUE"),
         stopAnims(vget("dino")),
         setImage(vget("dino"), S.dinoJump),
+        setVel(vget("dino"), sh.speed(0), null, sh.speed(-200)),
         playMusic("C5 E5 ", 400, "music.PlaybackMode.InBackground"),
       ],
     ]),
   ], 900, 0)
+);
+// releasing A ends the higher-jump hold
+topBlocks.push(
+  keyOnEvent("controller.A", "ControllerButtonEvent.Released", [
+    setVarBool("jumpHeld", "FALSE"),
+  ], 1250, 0)
 );
 
 // ---------- DUCK (down pressed / released) ----------
@@ -468,7 +493,7 @@ topBlocks.push(
         setVarBool("ducking", "TRUE"),
         stopAnims(vget("dino")),
         setImage(vget("dino"), S.dinoDuck),
-        setPos(vget("dino"), 24, 102),
+        setPos(vget("dino"), 24, 104),
       ],
     ]),
   ], 900, 400)
@@ -478,28 +503,37 @@ topBlocks.push(
     ifStmt([vget("ducking")], [
       [
         setVarBool("ducking", "FALSE"),
-        setPos(vget("dino"), 24, 94),
+        setPos(vget("dino"), 24, 100),
         functionCall("update_dino_image", "F_uddi"),
       ],
     ]),
   ], 900, 700)
 );
 
-// ---------- GRAVITY + LANDING (game update) ----------
+// ---------- GRAVITY + VARIABLE JUMP + LANDING (game update) ----------
+// While rising with A held, gravity is light (higher jump); releasing A or
+// falling uses heavy gravity (short hop, fast descent). vy is mirrored onto
+// the sprite every frame; landing when falling back to ground level.
 topBlocks.push(
   gameUpdate([
     ifStmt([vget("started")], [
       [
         ifStmt([not(vget("grounded"))], [
           [
-            changeVar("vy", 16),
-            ifStmt([cmp("GTE", { shadow: sh.num(0), block: getY(vget("dino")) }, { shadow: sh.num(94) })], [
+            ifStmt([and(vget("jumpHeld"), cmp("LT", { shadow: sh.num(0), block: vget("vy") }, { shadow: sh.num(0) }))], [
+              [setVarNum("gravity", 8)],
+            ], [setVarNum("gravity", 20)]),
+            changeVarExpr("vy", sh.num(0), vget("gravity")),
+            ifStmt([and(cmp("GT", { shadow: sh.num(0), block: vget("vy") }, { shadow: sh.num(0) }), cmp("GTE", { shadow: sh.num(0), block: getY(vget("dino")) }, { shadow: sh.num(100) }))], [
               [
-                setPos(vget("dino"), 24, 94),
+                setPos(vget("dino"), 24, 100),
                 setVarNum("vy", 0),
+                setVel(vget("dino"), sh.speed(0), null, sh.speed(0)),
                 setVarBool("grounded", "TRUE"),
                 functionCall("update_dino_image", "F_uddi"),
               ],
+            ], [
+              setVel(vget("dino"), sh.speed(0), null, sh.speed(0), vget("vy")),
             ]),
           ],
         ]),
