@@ -260,10 +260,14 @@ function worldMove(kindName, fractionNum, x, y) {
 const topBlocks = [];
 
 // ---------- ON START ----------
+const NO_SPLASH = !!process.env.NO_SPLASH;
+const startStmts = [
+  ...(NO_SPLASH ? [] : [splash("T-REX RUN!", "A = JUMP   DOWN = DUCK   REACH 500 TO WIN!")]),
+  setBackgroundColor(14),
+  ...(NO_SPLASH ? [setVarBool("started", "TRUE")] : []),
+];
 topBlocks.push(
-  onStart([
-    splash("T-REX RUN!", "A = JUMP   DOWN = DUCK   REACH 500 TO WIN!"),
-    setBackgroundColor(14),
+  onStart(startStmts.concat([
     setLife(3),
     setScore(0),
     setVarNum("speed", 100),
@@ -285,8 +289,8 @@ topBlocks.push(
     setVar("temp", createSprite(S.ground, "Projectile")),
     setPos(vget("temp"), 0, 109),
     playMusic("C5 E5 G5 A5 G5 E5 C5 D5 ", 120, "music.PlaybackMode.LoopingInBackground"),
-    setVarBool("started", "TRUE"),
-  ])
+    ...(NO_SPLASH ? [] : [setVarBool("started", "TRUE")]),
+  ]))
 );
 
 // ---------- SCORE TICK (forever) ----------
