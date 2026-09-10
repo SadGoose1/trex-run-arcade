@@ -1,5 +1,5 @@
 {
-    "name": "T-Rex Run 2",
+    "name": "T-Rex Run",
     "description": "A Chrome-style dinosaur endless runner built entirely with MakeCode Arcade block code.",
     "dependencies": {
         "device": "*"

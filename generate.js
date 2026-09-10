@@ -191,7 +191,7 @@ function destroy(spriteXml) {
   return block("spritedestroy2", `<mutation xmlns="http://www.w3.org/1999/xhtml" _expanded="0" _input_init="true"></mutation>` + value("sprite", sh.num(0), spriteXml));
 }
 function playMusic(melody, tempo, mode) {
-  const playable = `<shadow type="music_string_playable">` + value("melody", `<shadow type="melody_editor"><field name="melody">${esc(melody)}</field></shadow>`) + value("tempo", sh.tempo(tempo)) + `</shadow>`;
+  const playable = `<shadow type="music_string_playable">` + value("melody", `<shadow type="melody_editor"><field name="melody">&quot;${esc(melody)}&quot;</field></shadow>`) + value("tempo", sh.tempo(tempo)) + `</shadow>`;
   return block("music_playable_play", `<field name="playbackMode">${mode}</field>` + value("toPlay", playable));
 }
 function getY(spriteXml) {
