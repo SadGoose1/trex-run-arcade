@@ -275,7 +275,7 @@ topBlocks.push(
     setVarNum("vy", 0),
     setVarBool("grounded", "TRUE"),
     setVarBool("ducking", "FALSE"),
-    setVarBool("started", "FALSE"),
+    ...(NO_SPLASH ? [] : [setVarBool("started", "FALSE")]),
     setVarNum("starMs", 0),
     setVarNum("hitInvMs", 0),
     setVarNum("slowMs", 0),
