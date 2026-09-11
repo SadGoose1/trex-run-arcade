@@ -6,12 +6,13 @@ const fs = require("fs");
 const path = require("path");
 const S = require("./sprites.js");
 
+const SCORE_STEP = process.env.FASTSCORE ? 25 : 1;
 let idc = 0;
 const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
 const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
-const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase"];
+const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "paused", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
 plainVars.forEach((v) => (varId[v] = "var_" + v));
@@ -65,6 +66,9 @@ function value(name, shadowXml, blockXml) {
   return `<value name="${name}">${shadowXml}${blockXml || ""}</value>`;
 }
 
+function textJoin(t, blockXml) {
+  return block("text_join", `<mutation items="2"></mutation>` + value("ADD0", sh.text(t)) + value("ADD1", sh.text(""), blockXml));
+}
 function vget(name) {
   return block("variables_get", `<field name="VAR" id="${varId[name]}">${name}</field>`);
 }
@@ -265,7 +269,7 @@ const topBlocks = [];
 // ---------- ON START ----------
 const NO_SPLASH = !!process.env.NO_SPLASH;
 const startStmts = [
-  ...(NO_SPLASH ? [] : [splash("T-REX RUN!", "A = JUMP   DOWN = DUCK   REACH 500 TO WIN!")]),
+  ...(NO_SPLASH ? [] : [splash("T-REX RUN!", "A = JUMP  DOWN = DUCK  B = DONE!")]),
   setBackgroundColor(14),
   ...(NO_SPLASH ? [setVarBool("started", "TRUE")] : []),
 ];
@@ -277,6 +281,8 @@ topBlocks.push(
     setVarNum("effSpeed", 100),
     setVarNum("vy", 0),
     setVarNum("gravity", 20),
+    setVarNum("stage", 0),
+    setVarBool("paused", "FALSE"),
     setVarBool("jumpHeld", "FALSE"),
     setVarBool("grounded", "TRUE"),
     setVarBool("ducking", "FALSE"),
@@ -319,8 +325,17 @@ topBlocks.push(
       block("device_pause", value("pause", sh.time(100))),
       ifStmt([vget("started")], [
         [
-          changeScore(1),
-          setVar("speed", constrain(arith("ADD", { shadow: sh.num(100) }, { shadow: sh.num(2), block: arith("DIVIDE", { shadow: sh.num(0), block: scoreReporter() }, { shadow: sh.num(2) }) }), 100, 250)),
+          changeScore(SCORE_STEP),
+          setVar("speed", constrain(arith("ADD", { shadow: sh.num(100) }, { shadow: sh.num(3), block: arith("DIVIDE", { shadow: sh.num(0), block: scoreReporter() }, { shadow: sh.num(3) }) }), 100, 350)),
+          // STAGE UP every 500 points: freeze action, show splash, A continues
+          ifStmt([and(vget("started"), and(not(vget("paused")), cmp("GTE", { shadow: sh.num(0), block: scoreReporter() }, { shadow: sh.num(500), block: arith("MULTIPLY", { shadow: sh.num(0), block: arith("ADD", { shadow: sh.num(0), block: vget("stage") }, { shadow: sh.num(1) }) }, { shadow: sh.num(500) }) })))], [
+            [
+              changeVar("stage", 1),
+              setVarBool("paused", "TRUE"),
+              block("gameSplash", `<mutation xmlns="http://www.w3.org/1999/xhtml" _expanded="1" _input_init="true"></mutation>` + value("title", sh.text(""), textJoin("STAGE ", vget("stage"))) + value("subtitle", sh.text("PRESS A TO CONTINUE!"))),
+              setVarBool("paused", "FALSE"),
+            ],
+          ]),
         ],
       ]),
     ],
@@ -389,7 +404,7 @@ topBlocks.push(gameInterval(100, tick, 0, 1500));
 // ---------- OBSTACLE SPAWNER (every 900ms) ----------
 if (!process.env.NO_OBSTACLES) topBlocks.push(
   gameInterval(900, [
-    ifStmt([vget("started")], [
+    ifStmt([and(vget("started"), not(vget("paused")))], [
       [
         setVar("pick", random(1, 10)),
         ifStmt(
@@ -403,12 +418,28 @@ if (!process.env.NO_OBSTACLES) topBlocks.push(
               setPos(vget("temp"), 168, 100),
               setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
               setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
+              ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("stage") }, { shadow: sh.num(3) })], [
+                [
+                  setVar("temp", createSprite(S.cactus1, "Enemy")),
+                  setPos(vget("temp"), 196, 100),
+                  setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
+                  setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
+                ],
+              ]),
             ],
             [
               setVar("temp", createSprite(S.tree, "Enemy")),
               setPos(vget("temp"), 168, 90),
               setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
               setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
+              ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("stage") }, { shadow: sh.num(2) })], [
+                [
+                  setVar("temp", createSprite(S.tree, "Enemy")),
+                  setPos(vget("temp"), 194, 90),
+                  setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
+                  setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
+                ],
+              ]),
             ],
           ],
           [
@@ -417,6 +448,15 @@ if (!process.env.NO_OBSTACLES) topBlocks.push(
             runAnim(vget("temp"), [S.birdWingUp, S.birdWingDown], 200, "true"),
             setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
             setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
+            ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("stage") }, { shadow: sh.num(1) })], [
+              [
+                setVar("temp", createSprite(S.birdWingDown, "Enemy")),
+                setPos(vget("temp"), 204, 88),
+                runAnim(vget("temp"), [S.birdWingUp, S.birdWingDown], 200, "true"),
+                setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
+                setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
+              ],
+            ]),
           ]
         ),
       ],
@@ -427,7 +467,7 @@ if (!process.env.NO_OBSTACLES) topBlocks.push(
 // ---------- POWER-UP SPAWNER (every 7s, 60%) ----------
 if (!process.env.NO_POWERUPS) topBlocks.push(
   gameInterval(7000, [
-    ifStmt([and(vget("started"), block("percentchance", value("percentage", sh.percent(60))))], [
+    ifStmt([and(and(vget("started"), not(vget("paused"))), block("percentchance", value("percentage", sh.percent(60))))], [
       [
         setVar("pick", random(1, 3)),
         ifStmt(
@@ -463,7 +503,7 @@ if (!process.env.NO_POWERUPS) topBlocks.push(
 // ---------- CLOUD SPAWNER (every 2.6s, 70%) ----------
 topBlocks.push(
   gameInterval(2600, [
-    ifStmt([and(vget("started"), block("percentchance", value("percentage", sh.percent(70))))], [
+    ifStmt([and(and(vget("started"), not(vget("paused"))), block("percentchance", value("percentage", sh.percent(70))))], [
       [
         setVar("temp", createSprite(S.cloud, "Cloud")),
         setPos(vget("temp"), 168, 14),
@@ -490,6 +530,19 @@ topBlocks.push(
     ]),
   ], 900, 0)
 );
+// B = DONE: finish the run voluntarily with a confetti screen
+topBlocks.push(
+  keyOnEvent("controller.B", "ControllerButtonEvent.Pressed", [
+    ifStmt([and(vget("started"), not(vget("paused")))], [
+      [
+        setGameOverMessage("DONE! GREAT RUN!", "true"),
+        setGameOverEffect("effects.confetti", "true"),
+        gameOver2("true"),
+      ],
+    ]),
+  ], 1250, 300)
+);
+
 // releasing A ends the higher-jump hold
 topBlocks.push(
   keyOnEvent("controller.A", "ControllerButtonEvent.Released", [
@@ -628,14 +681,6 @@ topBlocks.push(
     gameOver2("false"),
   ], 2600, 0)
 );
-topBlocks.push(
-  onScore(500, [
-    setGameOverMessage("YOU SURVIVED! CHAMPION!", "true"),
-    setGameOverEffect("effects.confetti", "true"),
-    gameOver2("true"),
-  ], 2600, 350)
-);
-
 // ---------- update_dino_image FUNCTION ----------
 topBlocks.push(
   functionDef(
