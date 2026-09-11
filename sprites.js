@@ -181,6 +181,27 @@ const moon = [
 const ground = ["dddddddddddddddd", "cccccccccccccccc"].map((r) => r.repeat(10));
 
 
+// Dead dino: laid out flat on its back, feet up, eye open. Art in rows 9-15 so
+// at setPos y=100 the body rests on the ground line.
+const dinoDead = [
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "...........dd.dd",
+  "...........dd.dd",
+  ".d.........ddddd",
+  ".dd...dddddddddd",
+  "..dddddddd2ddddd",
+  "..dddddddddddddd",
+  ".dddddddddddddd.",
+];
+
 // Tree: 16x36. Requires a held (higher) jump to clear.
 const tree = [
   "................",
@@ -221,4 +242,4 @@ const tree = [
   "......7777......",
 ];
 
-module.exports = { dino1, dino2, dinoJump, dinoDuck, star1, star2, cactus1, cactus2, birdWingUp, birdWingDown, tree, starPow, heart, bolt, cloud, moon, ground };
+module.exports = { dino1, dino2, dinoJump, dinoDuck, dinoDead, star1, star2, cactus1, cactus2, birdWingUp, birdWingDown, tree, starPow, heart, bolt, cloud, moon, ground };

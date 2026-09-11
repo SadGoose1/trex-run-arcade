@@ -603,8 +603,18 @@ topBlocks.push(
 );
 
 // ---------- GAME OVER (life zero) + WIN (score 500) ----------
+// On death: lay the T-Rex flat on the ground (dead pose), make sure it is
+// visible (clear any mercy-blink), stop animations, then show the over screen.
 topBlocks.push(
-  lifeZeroEvent([setGameOverMessage("GAME OVER! NICE RUN!", "false")], 2600, 0)
+  lifeZeroEvent([
+    stopAnims(vget("dino")),
+    setImage(vget("dino"), S.dinoDead),
+    setPos(vget("dino"), 24, 100),
+    setVel(vget("dino"), sh.speed(0), null, sh.speed(0)),
+    setFlag(vget("dino"), "SpriteFlag.Invisible", sh.toggle("false")),
+    playMusic("E3 C3 G2 ", 200, "music.PlaybackMode.InBackground"),
+    setGameOverMessage("GAME OVER! NICE RUN!", "false"),
+  ], 2600, 0)
 );
 topBlocks.push(
   onScore(500, [
