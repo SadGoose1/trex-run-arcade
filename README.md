@@ -3,10 +3,11 @@
 A Chrome-Dino-inspired endless runner built **entirely with MakeCode Arcade blocks** (`main.blocks` — no hand-written code). Open this repository with MakeCode Arcade via **Import Project → Import URL**, **Play it: https://arcade.makecode.com/S80558-54191-94682-02972**
 
 ## How to Play
-- **A** (or Space): Jump over cacti. Jump over birds too — or **DOWN** to duck under them.
-- Score climbs every 100 ms — the longer you survive, the higher your score.
-- **3 lives.** Hitting an obstacle costs a life (with 1.5 s mercy-blink afterwards).
-- Reach **500 points** to win the champion screen!
+- **A** (hold for higher): Jump. **DOWN**: duck under birds.
+- **B**: DONE — finish the run anytime (confetti + your score).
+- Score climbs every 100 ms; **3 lives**, mercy-blink after a hit.
+- **Every 500 points = STAGE UP!** Press A to continue: the game speeds up (up to 350 px/s) and gets denser — Stage 2 adds bird pairs to duck, Stage 3+ doubles trees and cacti.
+- Running out of lives shows the T-Rex laid out flat on the ground on the game-over screen.
 
 ## Power-ups (spawn every ~7 seconds)
 | Icon | Name | Effect |
