@@ -605,6 +605,10 @@ topBlocks.push(
 // ---------- GAME OVER (life zero) + WIN (score 500) ----------
 // On death: lay the T-Rex flat on the ground (dead pose), make sure it is
 // visible (clear any mercy-blink), stop animations, then show the over screen.
+// helper: remove every sprite of a kind so the death scene is clean
+function destroyAllOfKind(kindName) {
+  return block("sprites_destroy_all_sprites_of_kind", value("kind", sh.kind(kindName)));
+}
 topBlocks.push(
   lifeZeroEvent([
     stopAnims(vget("dino")),
@@ -612,7 +616,14 @@ topBlocks.push(
     setPos(vget("dino"), 24, 100),
     setVel(vget("dino"), sh.speed(0), null, sh.speed(0)),
     setFlag(vget("dino"), "SpriteFlag.Invisible", sh.toggle("false")),
+    destroyAllOfKind("Enemy"),
+    destroyAllOfKind("Star"),
+    destroyAllOfKind("Heart"),
+    destroyAllOfKind("Bolt"),
+    destroyAllOfKind("Cloud"),
     playMusic("E3 C3 G2 ", 200, "music.PlaybackMode.InBackground"),
+    // let one frame render so the laid-out dino is on screen when it freezes
+    block("device_pause", value("pause", sh.time(100))),
     setGameOverMessage("GAME OVER! NICE RUN!", "false"),
     gameOver2("false"),
   ], 2600, 0)
