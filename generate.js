@@ -387,7 +387,7 @@ tick.push(
 topBlocks.push(gameInterval(100, tick, 0, 1500));
 
 // ---------- OBSTACLE SPAWNER (every 900ms) ----------
-topBlocks.push(
+if (!process.env.NO_OBSTACLES) topBlocks.push(
   gameInterval(900, [
     ifStmt([vget("started")], [
       [
