@@ -614,6 +614,7 @@ topBlocks.push(
     setFlag(vget("dino"), "SpriteFlag.Invisible", sh.toggle("false")),
     playMusic("E3 C3 G2 ", 200, "music.PlaybackMode.InBackground"),
     setGameOverMessage("GAME OVER! NICE RUN!", "false"),
+    gameOver2("false"),
   ], 2600, 0)
 );
 topBlocks.push(
