@@ -425,7 +425,7 @@ if (!process.env.NO_OBSTACLES) topBlocks.push(
 );
 
 // ---------- POWER-UP SPAWNER (every 7s, 60%) ----------
-topBlocks.push(
+if (!process.env.NO_POWERUPS) topBlocks.push(
   gameInterval(7000, [
     ifStmt([and(vget("started"), block("percentchance", value("percentage", sh.percent(60))))], [
       [
