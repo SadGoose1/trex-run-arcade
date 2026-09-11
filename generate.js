@@ -301,16 +301,14 @@ topBlocks.push(
 // ---------- AUTO-JUMP (test builds only) ----------
 if (process.env.AUTOJUMP) {
   topBlocks.push(
-    gameInterval(4000, [
+    gameInterval(1500, [
       setVarNum("vy", -200),
       setVarBool("grounded", "FALSE"),
       setVarBool("jumpHeld", "TRUE"),
       stopAnims(vget("dino")),
       setImage(vget("dino"), S.dinoJump),
       setVel(vget("dino"), sh.speed(0), null, sh.speed(-200)),
-      block("device_pause", value("pause", sh.time(150))),
-      setVarBool("jumpHeld", "FALSE"),
-    ], 3200, 0)
+    ], 3250, 0)
   );
 }
 
