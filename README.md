@@ -6,7 +6,7 @@ A Chrome-Dino-inspired endless runner built **entirely with MakeCode Arcade bloc
 - **A** (hold for higher): Jump. **DOWN**: duck under birds.
 - **B**: DONE — finish the run anytime (confetti + your score).
 - Score climbs every 100 ms; **3 lives**, mercy-blink after a hit.
-- **Every 500 points = STAGE UP!** Press A to continue: the game speeds up (up to 350 px/s) and gets denser — Stage 2 adds bird pairs to duck, Stage 3+ doubles trees and cacti.
+- **Every 500 points the game seamlessly gets harder** — no pauses: speed ramps toward 350 px/s, Stage 2 adds bird pairs to duck, Stage 3+ doubles trees and cacti.
 - Running out of lives shows the T-Rex laid out flat on the ground on the game-over screen.
 
 ## Power-ups (spawn every ~7 seconds)

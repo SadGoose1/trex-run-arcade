@@ -12,7 +12,7 @@ const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
 const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
-const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "paused", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase"];
+const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
 plainVars.forEach((v) => (varId[v] = "var_" + v));
@@ -282,7 +282,6 @@ topBlocks.push(
     setVarNum("vy", 0),
     setVarNum("gravity", 20),
     setVarNum("stage", 0),
-    setVarBool("paused", "FALSE"),
     setVarBool("jumpHeld", "FALSE"),
     setVarBool("grounded", "TRUE"),
     setVarBool("ducking", "FALSE"),
@@ -327,14 +326,9 @@ topBlocks.push(
         [
           changeScore(SCORE_STEP),
           setVar("speed", constrain(arith("ADD", { shadow: sh.num(100) }, { shadow: sh.num(3), block: arith("DIVIDE", { shadow: sh.num(0), block: scoreReporter() }, { shadow: sh.num(3) }) }), 100, 350)),
-          // STAGE UP every 500 points: freeze action, show splash, A continues
-          ifStmt([and(vget("started"), and(not(vget("paused")), cmp("GTE", { shadow: sh.num(0), block: scoreReporter() }, { shadow: sh.num(500), block: arith("MULTIPLY", { shadow: sh.num(0), block: arith("ADD", { shadow: sh.num(0), block: vget("stage") }, { shadow: sh.num(1) }) }, { shadow: sh.num(500) }) })))], [
-            [
-              changeVar("stage", 1),
-              setVarBool("paused", "TRUE"),
-              block("gameSplash", `<mutation xmlns="http://www.w3.org/1999/xhtml" _expanded="1" _input_init="true"></mutation>` + value("title", sh.text(""), textJoin("STAGE ", vget("stage"))) + value("subtitle", sh.text("PRESS A TO CONTINUE!"))),
-              setVarBool("paused", "FALSE"),
-            ],
+          // STAGE UP every 500 points: silently harder (pairs + speed), no pause
+          ifStmt([and(vget("started"), cmp("GTE", { shadow: sh.num(0), block: scoreReporter() }, { shadow: sh.num(500), block: arith("MULTIPLY", { shadow: sh.num(0), block: arith("ADD", { shadow: sh.num(0), block: vget("stage") }, { shadow: sh.num(1) }) }, { shadow: sh.num(500) }) }))], [
+            [changeVar("stage", 1)],
           ]),
         ],
       ]),
@@ -404,7 +398,7 @@ topBlocks.push(gameInterval(100, tick, 0, 1500));
 // ---------- OBSTACLE SPAWNER (every 900ms) ----------
 if (!process.env.NO_OBSTACLES) topBlocks.push(
   gameInterval(900, [
-    ifStmt([and(vget("started"), not(vget("paused")))], [
+    ifStmt([vget("started")], [
       [
         setVar("pick", random(1, 10)),
         ifStmt(
@@ -467,7 +461,7 @@ if (!process.env.NO_OBSTACLES) topBlocks.push(
 // ---------- POWER-UP SPAWNER (every 7s, 60%) ----------
 if (!process.env.NO_POWERUPS) topBlocks.push(
   gameInterval(7000, [
-    ifStmt([and(and(vget("started"), not(vget("paused"))), block("percentchance", value("percentage", sh.percent(60))))], [
+    ifStmt([and(vget("started"), block("percentchance", value("percentage", sh.percent(60))))], [
       [
         setVar("pick", random(1, 3)),
         ifStmt(
@@ -503,7 +497,7 @@ if (!process.env.NO_POWERUPS) topBlocks.push(
 // ---------- CLOUD SPAWNER (every 2.6s, 70%) ----------
 topBlocks.push(
   gameInterval(2600, [
-    ifStmt([and(and(vget("started"), not(vget("paused"))), block("percentchance", value("percentage", sh.percent(70))))], [
+    ifStmt([and(vget("started"), block("percentchance", value("percentage", sh.percent(70))))], [
       [
         setVar("temp", createSprite(S.cloud, "Cloud")),
         setPos(vget("temp"), 168, 14),
@@ -533,7 +527,7 @@ topBlocks.push(
 // B = DONE: finish the run voluntarily with a confetti screen
 topBlocks.push(
   keyOnEvent("controller.B", "ControllerButtonEvent.Pressed", [
-    ifStmt([and(vget("started"), not(vget("paused")))], [
+    ifStmt([vget("started")], [
       [
         setGameOverMessage("DONE! GREAT RUN!", "true"),
         setGameOverEffect("effects.confetti", "true"),
