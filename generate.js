@@ -13,7 +13,7 @@ const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
 const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
-const plainVars = ["dino", "temp", "ts", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "nameArr", "lbCount", "lastI", "insIdx", "letters", "entrySprites", "boardRows", "eCount", "rCount", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "j", "bIdx", "selftestPhase"];
+const plainVars = ["dino", "temp", "ts", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "nameArr", "lbCount", "lastI", "ok", "tmpS", "tmpN", "letters", "entrySprites", "boardRows", "eCount", "rCount", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "a", "pass", "bIdx", "selftestPhase"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
 plainVars.forEach((v) => (varId[v] = "var_" + v));
@@ -1049,41 +1049,50 @@ topBlocks.push(
   ], 0, 7300)
 );
 
-// F_lbsub: insert myScore/myName into the fixed-slot top-50 (sorted desc),
-// rank = insert position + 1. Scores of 0 are ignored.
+// F_lbsub: insert myScore/myName into the fixed-slot top-50 (sorted desc).
+// Insert at the end slot, then bubble down with one full adjacent-swap pass —
+// every statement mirrors a decompile-proven shape (see loader pitfalls).
+// Scores of 0 are ignored.
 topBlocks.push(
   functionDef("lb_submit", "F_lbsub", [
     setVarExpr("myScore", sh.num(0), scoreReporter()),
     ifStmt([cmp("GT", side(vget("myScore")), { shadow: sh.num(0) })], [
       [
-        setVarBool("first", "FALSE"),
-        setVarExpr("insIdx", sh.num(0), vget("lbCount")),
-        forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("lbCount") }, { shadow: sh.num(1) }), [
-          [ifStmt([and(not(vget("first")), cmp("GT", side(vget("myScore")), { shadow: sh.num(0), block: listGet("lbScores", vget("i")) }))], [
-            [
-              setVarExpr("insIdx", sh.num(0), vget("i")),
-              setVarBool("first", "TRUE"),
-            ],
-          ])],
-        ]),
-        ifStmt([or(vget("first"), cmp("LT", side(vget("lbCount")), { shadow: sh.num(50) }))], [
+        // qualifies: board not full, or beats the current lowest entry
+        setVarExpr("ok", sh.bool("FALSE"), block("logic_operation", `<field name="OP">OR</field>` +
+          value("A", sh.bool("TRUE"), cmp("LT", side(vget("lbCount")), { shadow: sh.num(50) })) +
+          value("B", sh.bool("TRUE"), cmp("GT", side(vget("myScore")), { shadow: sh.num(0), block: listGet("lbScores", sh.num(49)) })))),
+        ifStmt([vget("ok")], [
           [
-          setVarExpr("lastI", sh.num(0), constrain(vget("lbCount"), 0, 49)),
-          forLoop("cIdx", arith("MINUS", { shadow: sh.num(0), block: arith("MINUS", { shadow: sh.num(0), block: vget("lastI") }, { shadow: sh.num(0), block: vget("insIdx") }) }, { shadow: sh.num(1) }), [
-            [
-              // dedicated var: a variables_set on a for-loop index (i) is
-              // illegal in pxt blocks and silently drops the assignment
-              setVarExpr("j", sh.num(0), arith("MINUS", { shadow: sh.num(0), block: arith("MINUS", { shadow: sh.num(0), block: vget("lastI") }, { shadow: sh.num(0), block: vget("cIdx") }) }, { shadow: sh.num(1) })),
-              listSet("lbScores", arith("ADD", { shadow: sh.num(0), block: vget("j") }, { shadow: sh.num(1) }), listGet("lbScores", vget("j"))),
-              listSet("nameArr", arith("ADD", { shadow: sh.num(0), block: vget("j") }, { shadow: sh.num(1) }), listGet("nameArr", vget("j"))),
-            ],
-          ]),
-            listSet("lbScores", vget("insIdx"), vget("myScore")),
-            listSet("nameArr", vget("insIdx"), vget("myName")),
+            setVarExpr("lastI", sh.num(0), constrain(vget("lbCount"), 0, 49)),
+            listSet("lbScores", vget("lastI"), vget("myScore")),
+            listSet("nameArr", vget("lastI"), vget("myName")),
             ifStmt([cmp("LT", side(vget("lbCount")), { shadow: sh.num(50) })], [
               [changeVar("lbCount", 1)],
             ]),
-            setVarExpr("myRank", sh.num(0), arith("ADD", { shadow: sh.num(0), block: vget("insIdx") }, { shadow: sh.num(1) })),
+            // full bubble sort (49 passes): one pass moves the new entry up
+            // only one slot, so repeat until it settles (ties stay ahead of it)
+            forLoop("pass", sh.whole(48), [
+              [forLoop("a", sh.whole(48), [
+                [ifStmt([cmp("LT", { shadow: sh.num(0), block: listGet("lbScores", vget("a")) }, { shadow: sh.num(0), block: listGet("lbScores", arith("ADD", { shadow: sh.num(0), block: vget("a") }, { shadow: sh.num(1) })) })], [
+                  [
+                    setVarExpr("tmpS", sh.num(0), listGet("lbScores", arith("ADD", { shadow: sh.num(0), block: vget("a") }, { shadow: sh.num(1) }))),
+                    setVarExpr("tmpN", sh.text(""), listGet("nameArr", arith("ADD", { shadow: sh.num(0), block: vget("a") }, { shadow: sh.num(1) }))),
+                    listSet("lbScores", arith("ADD", { shadow: sh.num(0), block: vget("a") }, { shadow: sh.num(1) }), listGet("lbScores", vget("a"))),
+                    listSet("nameArr", arith("ADD", { shadow: sh.num(0), block: vget("a") }, { shadow: sh.num(1) }), listGet("nameArr", vget("a"))),
+                    listSet("lbScores", vget("a"), vget("tmpS")),
+                    listSet("nameArr", vget("a"), vget("tmpN")),
+                  ],
+                ])],
+              ])],
+            ]),
+            // rank = first slot (from the top) whose score is below mine
+            setVarNum("myRank", 0),
+            forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("lbCount") }, { shadow: sh.num(1) }), [
+              [ifStmt([and(cmp("EQ", side(vget("myRank")), { shadow: sh.num(0) }), cmp("LT", { shadow: sh.num(0), block: listGet("lbScores", vget("i")) }, side(vget("myScore"))))], [
+                [setVarExpr("myRank", sh.num(0), arith("ADD", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(1) }))],
+              ])],
+            ]),
             ...(NO_SETTINGS ? [] : [functionCall("lb_settings_save", "F_lbsave")]),
           ],
         ]),
