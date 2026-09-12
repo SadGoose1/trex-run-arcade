@@ -13,7 +13,7 @@ const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
 const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
-const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "nameArr", "lbCount", "lastI", "insIdx", "letters", "entrySprites", "boardRows", "eCount", "rCount", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "bIdx", "selftestPhase"];
+const plainVars = ["dino", "temp", "ts", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "nameArr", "lbCount", "lastI", "insIdx", "letters", "entrySprites", "boardRows", "eCount", "rCount", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "bIdx", "selftestPhase"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
 plainVars.forEach((v) => (varId[v] = "var_" + v));
@@ -132,11 +132,24 @@ function list50(itemShadow) {
   for (let k = 0; k < 50; k++) values += value("ADD" + k, itemShadow);
   return block("lists_create_with", `<mutation items="50"></mutation>` + values);
 }
+// 50-slot list of the SAME block expression — used to seed sprite lists with
+// a hidden text sprite so the list decompiles as TextSprite[] (a number-seeded
+// list decompiles as number[] and fails TS assignment)
+function list50Of(blockXml) {
+  let values = "";
+  for (let k = 0; k < 50; k++) values += value("ADD" + k, null, blockXml);
+  return block("lists_create_with", `<mutation items="50"></mutation>` + values);
+}
 function side(v) {
   return { shadow: sh.num(0), block: v };
 }
 function textJoinBB(b0, b1) {
-  return block("text_join", `<mutation items="2"></mutation>` + value("ADD0", sh.text(""), b0) + value("ADD1", sh.text(""), b1));
+  // each arg may be a block xml string or a literal text shadow
+  const asSide = (x) => (typeof x === "string" && x.startsWith("<block"))
+    ? { shadow: sh.text(""), block: x }
+    : { shadow: x };
+  const a = asSide(b0), b = asSide(b1);
+  return block("text_join", `<mutation items="2"></mutation>` + value("ADD0", a.shadow, a.block) + value("ADD1", b.shadow, b.block));
 }
 function textJoin(t, blockXml) {
   return block("text_join", `<mutation items="2"></mutation>` + value("ADD0", sh.text(t)) + value("ADD1", sh.text(""), blockXml));
@@ -248,8 +261,8 @@ function changeLife(n) { return block("hudChangeLifeBy", value("value", sh.num(n
 function createSprite(rows, kind) {
   return block("spritescreate", value("img", imgPicker(rows)) + value("kind", sh.kind(kind)));
 }
-function setPos(spriteXml, x, y, yBlock) {
-  return block("spritesetpos", value("sprite", sh.num(0), spriteXml) + value("x", sh.pos(x)) + value("y", sh.pos(y), yBlock));
+function setPos(spriteXml, x, y, yBlock, xBlock) {
+  return block("spritesetpos", value("sprite", sh.num(0), spriteXml) + value("x", sh.pos(x), xBlock) + value("y", sh.pos(y), yBlock));
 }
 function setVel(spriteXml, vxShadow, vxBlock, vyShadow, vyBlock) {
   return block("spritesetvel", value("sprite", sh.num(0), spriteXml) + value("vx", vxShadow, vxBlock) + value("vy", vyShadow, vyBlock));
@@ -397,8 +410,10 @@ topBlocks.push(
     listSet("nameArr", sh.whole(0), sh.text("AAA")),
     listSet("nameArr", sh.whole(1), sh.text("BBB")),
     setVarNum("lbCount", 2),
-    setVarExpr("entrySprites", sh.num(0), list50(sh.num(0))),
-    setVarExpr("boardRows", sh.num(0), list50(sh.num(0))),
+    // hidden empty-text sprite seeds the sprite lists so they type as TextSprite[]
+    setVar("ts", textSpriteCreate(sh.text(""))),
+    setVarExpr("entrySprites", sh.num(0), list50Of(vget("ts"))),
+    setVarExpr("boardRows", sh.num(0), list50Of(vget("ts"))),
     setVarExpr("slots", sh.num(0), block("lists_create_with", `<mutation items="3"></mutation>` + value("ADD0", sh.num(0)) + value("ADD1", sh.num(0)) + value("ADD2", sh.num(0)))),
     setVarExpr("letters", sh.num(0), block("lists_create_with", `<mutation items="26"></mutation>` +
       ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"].map((L, k) => value("ADD" + k, sh.text(L))).join(""))),
@@ -942,28 +957,28 @@ topBlocks.push(
     ]),
     setVarNum("eCount", 0),
     setVarNum("rCount", 0),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("T-REX RUN!"))),
-    setPos(vget("temp"), 80, 7),
-    tsSetFont(vget("temp"), 8),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("ENTER NAME"))),
-    setPos(vget("temp"), 80, 18),
-    tsSetFont(vget("temp"), 6),
+    setVar("ts", textSpriteCreate(sh.text("T-REX RUN!"))),
+    setPos(vget("ts"), 80, 7),
+    tsSetFont(vget("ts"), 8),
+    setVar("ts", textSpriteCreate(sh.text("ENTER NAME"))),
+    setPos(vget("ts"), 80, 18),
+    tsSetFont(vget("ts"), 6),
     forLoop("i", sh.whole(2), [
-      setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("A"))),
-      tsSetFont(vget("temp"), 8),
-      setPos(vget("temp"), arith("ADD", { shadow: sh.num(68) }, { shadow: sh.num(12), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(12) }) }), 28),
-      listSet("entrySprites", vget("eCount"), vget("temp")),
+      setVar("ts", textSpriteCreate(sh.text("A"))),
+      tsSetFont(vget("ts"), 8),
+      setPos(vget("ts"), 0, 28, null, arith("ADD", { shadow: sh.num(68) }, { shadow: sh.num(12), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(12) }) })),
+      listSet("entrySprites", vget("eCount"), vget("ts")),
       changeVar("eCount", 1),
     ]),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("^"))),
-    setPos(vget("temp"), 68, 35),
-    tsSetFont(vget("temp"), 6),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("UP/DOWN LETTER  A=OK  B=BACK"))),
-    setPos(vget("temp"), 80, 42),
-    tsSetFont(vget("temp"), 4),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("TOP SCORES"))),
-    setPos(vget("temp"), 80, 54),
-    tsSetFont(vget("temp"), 5),
+    setVar("ts", textSpriteCreate(sh.text("^"))),
+    setPos(vget("ts"), 68, 35),
+    tsSetFont(vget("ts"), 6),
+    setVar("ts", textSpriteCreate(sh.text("UP/DOWN LETTER  A=OK  B=BACK"))),
+    setPos(vget("ts"), 80, 42),
+    tsSetFont(vget("ts"), 4),
+    setVar("ts", textSpriteCreate(sh.text("TOP SCORES"))),
+    setPos(vget("ts"), 80, 54),
+    tsSetFont(vget("ts"), 5),
   ], 0, 6600)
 );
 
@@ -981,14 +996,14 @@ topBlocks.push(
         cmp("GT", { shadow: sh.num(0), block: listGet("lbScores", vget("bIdx")) }, { shadow: sh.num(0) })
       )], [
         [
-          setVarExpr("temp", sh.num(0), textSpriteCreate(
+          setVar("ts", textSpriteCreate(
             textJoinBB(
               textJoinBB(textJoinBB(arith("ADD", { shadow: sh.num(0), block: vget("bIdx") }, { shadow: sh.num(1) }), sh.text(". ")), listGet("nameArr", vget("bIdx"))),
               textJoinBB(sh.text(" "), listGet("lbScores", vget("bIdx")))
             ))),
-          tsSetFont(vget("temp"), 6),
-          setPos(vget("temp"), 80, arith("ADD", { shadow: sh.num(62) }, { shadow: sh.num(6), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(6) }) })),
-          listSet("boardRows", vget("rCount"), vget("temp")),
+          tsSetFont(vget("ts"), 6),
+          setPos(vget("ts"), 80, arith("ADD", { shadow: sh.num(62) }, { shadow: sh.num(6), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(6) }) })),
+          listSet("boardRows", vget("rCount"), vget("ts")),
           changeVar("rCount", 1),
         ],
       ]),
@@ -1094,6 +1109,42 @@ function checkXml(s) {
   return true;
 }
 checkXml(xml);
+
+// corruption audit: block markup must never appear escaped inside a field,
+// and each <value> may hold at most one direct-child shadow + one direct-child
+// block (nested shadows inside blocks are fine — e.g. music_string_playable)
+if (/&lt;/.test(xml)) throw new Error("escaped markup leaked into a field");
+{
+  const tagRe = /<(\/?)(value|shadow|block|field)\b[^>]*?(\/?)>/g;
+  const stack = []; // {tag, shadows, blocks}
+  let m;
+  while ((m = tagRe.exec(xml))) {
+    const closing = m[1] === "/";
+    const selfClose = m[3] === "/";
+    const tag = m[2];
+    if (closing) {
+      const top = stack.pop();
+      if (!top || top.tag !== tag) throw new Error("audit stack mismatch at " + m.index);
+      if (top.tag === "value" && stack.length) {
+        if (top.shadows > 1) throw new Error("value with " + top.shadows + " direct shadows");
+        if (top.blocks > 1) throw new Error("value with " + top.blocks + " direct blocks");
+      }
+      continue;
+    }
+    if (!selfClose) stack.push({ tag, shadows: 0, blocks: 0 });
+    const parent = stack[stack.length - 1];
+    if (parent && parent.tag === "value" && !closing && stack[stack.length - 1] !== undefined) {
+      // opening tag of a direct child is counted when it is pushed
+    }
+    // count this opening element in its parent value
+    const p = stack.length > 0 ? stack[stack.length - 1] : null;
+    if (p && p.tag === "value" && !closing) {
+      if (tag === "shadow") p.shadows++;
+      if (tag === "block") p.blocks++;
+    }
+  }
+  if (stack.length) throw new Error("audit: unclosed " + stack.map(s => s.tag).join(","));
+}
 
 // sanity: every referenced VAR id exists in registry
 for (const m of xml.matchAll(/<field name="VAR" id="([^"]+)">/g)) {

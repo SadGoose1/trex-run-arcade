@@ -2,7 +2,8 @@
     "name": "T-Rex Run SelfTest",
     "description": "A Chrome-style dinosaur endless runner built entirely with MakeCode Arcade block code.",
     "dependencies": {
-        "device": "*"
+        "device": "*",
+        "arcade-text": "github:microsoft/arcade-text#v1.3.0"
     },
     "files": [
         "main.blocks",

@@ -3,6 +3,7 @@
     "description": "A Chrome-style dinosaur endless runner built entirely with MakeCode Arcade block code.",
     "dependencies": {
         "device": "*",
+        "arcade-text": "github:microsoft/arcade-text#v1.3.0",
         "settings-blocks": "github:microsoft/pxt-settings-blocks#v1.0.0"
     },
     "files": [
