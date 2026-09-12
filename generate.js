@@ -268,6 +268,18 @@ function ifStmt(conds, branches, elseStmts) {
   return block("controls_if", inner);
 }
 
+
+// the 3 editable letter slots live at entrySprites[2..4]; index 0 is the game
+// title, 1 is ENTER NAME, 5 is the caret — offset every nameI lookup by 2
+function letterSlot() {
+  return listGet("entrySprites", arith("ADD", { shadow: sh.num(0), block: vget("nameI") }, { shadow: sh.num(2) }));
+}
+function caretSprite() {
+  return listGet("entrySprites", sh.num(5));
+}
+function caretMove() {
+  return setPos(caretSprite(), 0, 35, null, arith("ADD", { shadow: sh.num(68) }, { shadow: sh.num(12), block: vget("nameI") }));
+}
 // ---------------- game statement builders ----------------
 function splash(title, subtitle) {
   return block("gameSplash", `<mutation xmlns="http://www.w3.org/1999/xhtml" _expanded="1" _input_init="true"></mutation>` + value("title", sh.text(title)) + value("subtitle", sh.text(subtitle)));
@@ -697,7 +709,7 @@ topBlocks.push(
   keyOnEvent("controller.A", "ControllerButtonEvent.Pressed", [
     ifStmt([vget("entryMode")], [
       [
-        tsSetText(listGet("entrySprites", vget("nameI")), listGet("letters", vget("charI"))),
+        tsSetText(letterSlot(), listGet("letters", vget("charI"))),
         listSet("slots", vget("nameI"), vget("charI")),
         changeVar("nameI", 1),
         ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("nameI") }, { shadow: sh.num(3) })], [
@@ -714,6 +726,9 @@ topBlocks.push(
             setVarNum("rCount", 0),
             setVarBool("started", "TRUE"),
           ],
+        ], [
+          // not done yet: slide the caret under the next slot
+          [caretMove()],
         ]),
       ],
     ], [
@@ -739,7 +754,10 @@ topBlocks.push(
         ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("nameI") }, { shadow: sh.num(0) })], [
           [
             changeVar("nameI", -1),
-            tsSetText(listGet("entrySprites", vget("nameI")), listGet("letters", vget("charI"))),
+            // restore the letter that was in the slot and move the caret back
+            setVarExpr("charI", sh.num(0), listGet("slots", vget("nameI"))),
+            tsSetText(letterSlot(), listGet("letters", vget("charI"))),
+            caretMove(),
           ],
         ]),
       ],
@@ -776,7 +794,7 @@ topBlocks.push(
         ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("charI") }, { shadow: sh.num(25) })], [
           [setVarNum("charI", 0)],
         ]),
-        tsSetText(listGet("entrySprites", vget("nameI")), listGet("letters", vget("charI"))),
+        tsSetText(letterSlot(), listGet("letters", vget("charI"))),
       ],
     ]),
   ], 1250, 600)
@@ -789,7 +807,7 @@ topBlocks.push(
         ifStmt([cmp("LT", { shadow: sh.num(0), block: vget("charI") }, { shadow: sh.num(0) })], [
           [setVarNum("charI", 25)],
         ]),
-        tsSetText(listGet("entrySprites", vget("nameI")), listGet("letters", vget("charI"))),
+        tsSetText(letterSlot(), listGet("letters", vget("charI"))),
       ],
     ]),
   ], 1250, 900)
