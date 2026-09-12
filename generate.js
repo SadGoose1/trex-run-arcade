@@ -7,6 +7,7 @@ const path = require("path");
 const S = require("./sprites.js");
 
 const SCORE_STEP = process.env.FASTSCORE ? 25 : 1;
+const NO_SETTINGS = !!process.env.NO_SETTINGS;
 let idc = 0;
 const nid = () => "blk" + (++idc);
 
@@ -364,14 +365,20 @@ topBlocks.push(
     setVar("lbNames", sh.text("")),
     setVarExpr("entrySprites", sh.num(0), emptyList()),
     setVarExpr("slots", sh.num(0), block("lists_create_with", `<mutation items="3"></mutation>` + value("ADD0", sh.num(0)) + value("ADD1", sh.num(0)) + value("ADD2", sh.num(0)))),
-    ifStmt([not(settingsExists("lbScores"))], [
-      [
-        settingsWriteNumberArray("lbScores"),
-        settingsWriteString("lbNames", sh.text("AAA,BBB")),
-      ],
+    ...(NO_SETTINGS ? [] : [
+      ifStmt([not(settingsExists("lbScores"))], [
+        [
+          settingsWriteNumberArray("lbScores"),
+          settingsWriteString("lbNames", sh.text("AAA,BBB")),
+        ],
+      ]),
+      setVarExpr("lbScores", sh.num(0), settingsReadNumberArray("lbScores")),
+      setVarExpr("lbNames", sh.text(""), settingsReadString("lbNames")),
     ]),
-    setVarExpr("lbScores", sh.num(0), settingsReadNumberArray("lbScores")),
-    setVarExpr("lbNames", sh.text(""), settingsReadString("lbNames")),
+    ...(NO_SETTINGS ? [
+      setVarExpr("lbScores", sh.num(0), block("lists_create_with", `<mutation items="2"></mutation>` + value("ADD0", sh.num(100)) + value("ADD1", sh.num(50)))),
+      setVarExpr("lbNames", sh.text(""), sh.text("AAA,BBB")),
+    ] : []),
     setVarExpr("letters", sh.num(0), block("lists_create_with", `<mutation items="26"></mutation>` +
       ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"].map((L, k) => value("ADD" + k, sh.text(L))).join(""))),
     functionCall("lb_entry_show", "F_eshow"),
