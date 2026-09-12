@@ -1109,15 +1109,20 @@ if (!NO_SETTINGS) {
     functionDef("lb_settings_load", "F_lbload", [
       ifStmt([settingsExists("lbScores")], [
         [
+          // defensive: a failed/empty settings read must not wipe the seeds
           setVarExpr("lbScores", sh.num(0), settingsReadNumberArray("lbScores")),
-          forLoop("i", sh.whole(49), [
-            [listSet("nameArr", vget("i"), settingsReadStringBlock(textJoin("lbN", vget("i"))))],
-          ]),
-          setVarNum("lbCount", 0),
-          forLoop("i", sh.whole(49), [
-            [ifStmt([cmp("GT", { shadow: sh.num(0), block: listGet("lbScores", vget("i")) }, { shadow: sh.num(0) })], [
-              [setVarExpr("lbCount", sh.num(0), arith("ADD", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(1) }))],
-            ])],
+          ifStmt([cmp("GT", { shadow: sh.num(0), block: block("lists_length", value("VALUE", sh.num(0), vget("lbScores"))) }, { shadow: sh.num(0) })], [
+            [
+              forLoop("i", sh.whole(49), [
+                [listSet("nameArr", vget("i"), settingsReadStringBlock(textJoin("lbN", vget("i"))))],
+              ]),
+              setVarNum("lbCount", 0),
+              forLoop("i", sh.whole(49), [
+                [ifStmt([cmp("GT", { shadow: sh.num(0), block: listGet("lbScores", vget("i")) }, { shadow: sh.num(0) })], [
+                  [setVarExpr("lbCount", sh.num(0), arith("ADD", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(1) }))],
+                ])],
+              ]),
+            ],
           ]),
         ],
       ]),
