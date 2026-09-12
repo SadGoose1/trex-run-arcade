@@ -551,8 +551,10 @@ topBlocks.push(
       ]),
       changeVar("cIdx", 1),
     ]),
-    settingsWriteNumberArray("lbScores"),
-    settingsWriteString("lbNames", vget("tmpStr")),
+    ...(NO_SETTINGS ? [] : [
+      settingsWriteNumberArray("lbScores"),
+      settingsWriteString("lbNames", vget("tmpStr")),
+    ]),
   ], 0, 8000)
 );
 
