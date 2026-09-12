@@ -13,7 +13,7 @@ const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
 const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
-const plainVars = ["dino", "temp", "ts", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "nameArr", "lbCount", "lastI", "insIdx", "letters", "entrySprites", "boardRows", "eCount", "rCount", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "bIdx", "selftestPhase"];
+const plainVars = ["dino", "temp", "ts", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "nameArr", "lbCount", "lastI", "insIdx", "letters", "entrySprites", "boardRows", "eCount", "rCount", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "j", "bIdx", "selftestPhase"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
 plainVars.forEach((v) => (varId[v] = "var_" + v));
@@ -80,17 +80,26 @@ function listPush(listVar, valueBlock) {
 function listLen(listVar) {
   return block("lists_length", value("LIST", sh.num(0), vget(listVar)));
 }
-function listGet(listVar, idxBlock) {
-  return block("lists_index_get", value("LIST", sh.num(0), vget(listVar)) + value("INDEX", sh.num(0), idxBlock));
+function listGet(listVar, idx) {
+  // idx may be block XML (nested under a default shadow) or a shadow/number
+  const a = (typeof idx === "string" && idx.startsWith("<block")) ? { shadow: sh.num(0), block: idx } : { shadow: idx };
+  return block("lists_index_get", value("LIST", sh.num(0), vget(listVar)) + value("INDEX", a.shadow, a.block));
 }
-function listSet(listVar, idxBlock, valueBlock) {
-  return block("lists_index_set", value("LIST", sh.num(0), vget(listVar)) + value("INDEX", sh.num(0), idxBlock) + value("VALUE", sh.num(0), valueBlock));
+function listSet(listVar, idx, val) {
+  // idx/val may be block XML (nested under default shadows) or shadows
+  const asSide = (x) => (typeof x === "string" && x.startsWith("<block")) ? { shadow: sh.num(0), block: x } : { shadow: x };
+  const a = asSide(idx), b = asSide(val);
+  return block("lists_index_set", value("LIST", sh.num(0), vget(listVar)) + value("INDEX", a.shadow, a.block) + value("VALUE", b.shadow, b.block));
 }
 function forOfList(loopVar, listBlock, stmts) {
   return `<block type="pxt_controls_for_of" id="${nid()}">` + value("VAR", sh.reporter(loopVar)) + value("LIST", sh.num(0), listBlock) + `<statement name="DO">${chain(stmts)}</statement></block>`;
 }
-function forLoop(loopVar, toBlock, stmts) {
-  return `<block type="pxt_controls_for" id="${nid()}">` + value("VAR", sh.reporter(loopVar)) + value("TO", sh.whole(10), toBlock) + `<statement name="DO">${chain(stmts)}</statement></block>`;
+function forLoop(loopVar, to, stmts) {
+  // to may be a number, a shadow, or a block expression
+  const t = (typeof to === "string" && (to.startsWith("<block") || to.startsWith("<shadow")))
+    ? (to.startsWith("<block") ? { shadow: sh.whole(10), block: to } : { shadow: to })
+    : { shadow: sh.whole(numOnly(to)) };
+  return `<block type="pxt_controls_for" id="${nid()}">` + value("VAR", sh.reporter(loopVar)) + value("TO", t.shadow, t.block) + `<statement name="DO">${chain(stmts)}</statement></block>`;
 }
 function settingsExists(name) {
   return block("block_settings_exists", value("name", sh.text(name)));
@@ -117,8 +126,11 @@ function settingsReadString(name) {
 function stringSplit(strBlock, sep) {
   return block("string_split", value("this", sh.text(""), strBlock) + value("sep", sh.text(sep)));
 }
-function textSpriteCreate(textBlock) {
-  return block("textsprite_create", `<mutation xmlns="http://www.w3.org/1999/xhtml" _expanded="0" _input_init="true"></mutation>` + value("text", sh.text(""), textBlock) + value("fg", sh.color(1)));
+function textSpriteCreate(text) {
+  // text may be a plain string, a text shadow, or a block (e.g. text_join)
+  const isBlock = typeof text === "string" && text.startsWith("<block");
+  const isShadow = typeof text === "string" && text.startsWith("<shadow");
+  return block("textsprite_create", `<mutation xmlns="http://www.w3.org/1999/xhtml" _expanded="0" _input_init="true"></mutation>` + value("text", isBlock ? sh.text("") : (isShadow ? text : sh.text(text)), isBlock ? text : undefined) + value("fg", sh.color(1)));
 }
 function tsSetText(spriteXml, textBlock) {
   return block("TextSprite_setText", value("this", sh.num(0), spriteXml) + value("text", sh.text(""), textBlock));
@@ -183,7 +195,10 @@ function chain(stmts) {
 }
 
 function setVar(name, valueXml) {
-  return block("variables_set", `<field name="VAR" id="${varId[name]}">${name}</field>` + value("VALUE", sh.num(0), valueXml));
+  // valueXml is either a block (nested under a default shadow) or a full
+  // value-side XML such as a text shadow
+  const isBlock = typeof valueXml === "string" && valueXml.startsWith("<block");
+  return block("variables_set", `<field name="VAR" id="${varId[name]}">${name}</field>` + value("VALUE", isBlock ? sh.num(0) : valueXml, isBlock ? valueXml : undefined));
 }
 function setVarBool(name, boolVal) {
   return block("variables_set", `<field name="VAR" id="${varId[name]}">${name}</field>` + value("VALUE", sh.bool(boolVal)));
@@ -431,9 +446,10 @@ topBlocks.push(
 );
 
 // ---------- SELFTEST (test builds only) ----------
-// One-shot phases on a 2s ticker: phase 0 -> fake a finished run (score 123,
-// name ZQX) through lb_submit + lb_board_show; phase 1 -> leave entry mode and
-// start gameplay the same way the real A=OK confirm does.
+// Loop A fires once at ~2s: fake a finished run (score 123, name ZQX) through
+// lb_submit + lb_board_show. Loop B fires once at ~60s: leave entry mode and
+// start gameplay the same way the real A=OK confirm does (kept long so the
+// submitted board stays on screen for screenshot verification).
 if (process.env.SELFTEST) {
   topBlocks.push(
     foreverLoop([
@@ -446,24 +462,28 @@ if (process.env.SELFTEST) {
           functionCall("lb_board_show", "F_bshow"),
           setVarNum("selftestPhase", 1),
         ],
-      ], [
-        ifStmt([cmp("EQ", { shadow: sh.num(0), block: vget("selftestPhase") }, { shadow: sh.num(1) })], [
-          [
-            forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("eCount") }, { shadow: sh.num(1) }), [
-              [destroy(listGet("entrySprites", vget("i")))],
-            ]),
-            forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("rCount") }, { shadow: sh.num(1) }), [
-              [destroy(listGet("boardRows", vget("i")))],
-            ]),
-            setVarNum("eCount", 0),
-            setVarNum("rCount", 0),
-            setVarBool("entryMode", "FALSE"),
-            setVarBool("started", "TRUE"),
-            setVarNum("selftestPhase", 2),
-          ],
-        ]),
       ]),
     ], 0, 0)
+  );
+  topBlocks.push(
+    foreverLoop([
+      block("device_pause", value("pause", sh.time(60000))),
+      ifStmt([cmp("EQ", { shadow: sh.num(0), block: vget("selftestPhase") }, { shadow: sh.num(1) })], [
+        [
+          forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("eCount") }, { shadow: sh.num(1) }), [
+            [destroy(listGet("entrySprites", vget("i")))],
+          ]),
+          forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("rCount") }, { shadow: sh.num(1) }), [
+            [destroy(listGet("boardRows", vget("i")))],
+          ]),
+          setVarNum("eCount", 0),
+          setVarNum("rCount", 0),
+          setVarBool("entryMode", "FALSE"),
+          setVarBool("started", "TRUE"),
+          setVarNum("selftestPhase", 2),
+        ],
+      ]),
+    ], 0, 400)
   );
 }
 
@@ -964,12 +984,17 @@ topBlocks.push(
     ]),
     setVarNum("eCount", 0),
     setVarNum("rCount", 0),
+    // every entry-screen sprite is tracked so the confirm path clears them all
     setVar("ts", textSpriteCreate(sh.text("T-REX RUN!"))),
     setPos(vget("ts"), 80, 7),
     tsSetFont(vget("ts"), 8),
+    listSet("entrySprites", vget("eCount"), vget("ts")),
+    changeVar("eCount", 1),
     setVar("ts", textSpriteCreate(sh.text("ENTER NAME"))),
     setPos(vget("ts"), 80, 18),
     tsSetFont(vget("ts"), 6),
+    listSet("entrySprites", vget("eCount"), vget("ts")),
+    changeVar("eCount", 1),
     forLoop("i", sh.whole(2), [
       setVar("ts", textSpriteCreate(sh.text("A"))),
       tsSetFont(vget("ts"), 8),
@@ -980,12 +1005,18 @@ topBlocks.push(
     setVar("ts", textSpriteCreate(sh.text("^"))),
     setPos(vget("ts"), 68, 35),
     tsSetFont(vget("ts"), 6),
-    setVar("ts", textSpriteCreate(sh.text("UP/DOWN LETTER  A=OK  B=BACK"))),
+    listSet("entrySprites", vget("eCount"), vget("ts")),
+    changeVar("eCount", 1),
+    setVar("ts", textSpriteCreate(sh.text("UP/DOWN  A=OK  B=BACK"))),
     setPos(vget("ts"), 80, 42),
     tsSetFont(vget("ts"), 4),
+    listSet("entrySprites", vget("eCount"), vget("ts")),
+    changeVar("eCount", 1),
     setVar("ts", textSpriteCreate(sh.text("TOP SCORES"))),
     setPos(vget("ts"), 80, 54),
     tsSetFont(vget("ts"), 5),
+    listSet("entrySprites", vget("eCount"), vget("ts")),
+    changeVar("eCount", 1),
   ], 0, 6600)
 );
 
@@ -1037,14 +1068,16 @@ topBlocks.push(
         ]),
         ifStmt([or(vget("first"), cmp("LT", side(vget("lbCount")), { shadow: sh.num(50) }))], [
           [
-            setVarExpr("lastI", sh.num(0), constrain(vget("lbCount"), 0, 49)),
-            forLoop("cIdx", arith("MINUS", { shadow: sh.num(0), block: arith("MINUS", { shadow: sh.num(0), block: vget("lastI") }, { shadow: sh.num(0), block: vget("insIdx") }) }, { shadow: sh.num(1) }), [
-              [
-                setVarExpr("i", sh.num(0), arith("MINUS", { shadow: sh.num(0), block: arith("MINUS", { shadow: sh.num(0), block: vget("lastI") }, { shadow: sh.num(0), block: vget("cIdx") }) }, { shadow: sh.num(1) })),
-                listSet("lbScores", arith("ADD", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(1) }), listGet("lbScores", vget("i"))),
-                listSet("nameArr", arith("ADD", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(1) }), listGet("nameArr", vget("i"))),
-              ],
-            ]),
+          setVarExpr("lastI", sh.num(0), constrain(vget("lbCount"), 0, 49)),
+          forLoop("cIdx", arith("MINUS", { shadow: sh.num(0), block: arith("MINUS", { shadow: sh.num(0), block: vget("lastI") }, { shadow: sh.num(0), block: vget("insIdx") }) }, { shadow: sh.num(1) }), [
+            [
+              // dedicated var: a variables_set on a for-loop index (i) is
+              // illegal in pxt blocks and silently drops the assignment
+              setVarExpr("j", sh.num(0), arith("MINUS", { shadow: sh.num(0), block: arith("MINUS", { shadow: sh.num(0), block: vget("lastI") }, { shadow: sh.num(0), block: vget("cIdx") }) }, { shadow: sh.num(1) })),
+              listSet("lbScores", arith("ADD", { shadow: sh.num(0), block: vget("j") }, { shadow: sh.num(1) }), listGet("lbScores", vget("j"))),
+              listSet("nameArr", arith("ADD", { shadow: sh.num(0), block: vget("j") }, { shadow: sh.num(1) }), listGet("nameArr", vget("j"))),
+            ],
+          ]),
             listSet("lbScores", vget("insIdx"), vget("myScore")),
             listSet("nameArr", vget("insIdx"), vget("myName")),
             ifStmt([cmp("LT", side(vget("lbCount")), { shadow: sh.num(50) })], [
@@ -1134,22 +1167,17 @@ if (/&lt;/.test(xml)) throw new Error("escaped markup leaked into a field");
     if (closing) {
       const top = stack.pop();
       if (!top || top.tag !== tag) throw new Error("audit stack mismatch at " + m.index);
-      if (top.tag === "value" && stack.length) {
-        if (top.shadows > 1) throw new Error("value with " + top.shadows + " direct shadows");
+      if (top.tag === "value") {
+        if (top.shadows > 1) throw new Error("value with " + top.shadows + " direct shadows: " + xml.slice(Math.max(0, m.index - 200), m.index));
         if (top.blocks > 1) throw new Error("value with " + top.blocks + " direct blocks");
       }
       continue;
     }
+    const parent = stack.length ? stack[stack.length - 1] : null;
     if (!selfClose) stack.push({ tag, shadows: 0, blocks: 0 });
-    const parent = stack[stack.length - 1];
-    if (parent && parent.tag === "value" && !closing && stack[stack.length - 1] !== undefined) {
-      // opening tag of a direct child is counted when it is pushed
-    }
-    // count this opening element in its parent value
-    const p = stack.length > 0 ? stack[stack.length - 1] : null;
-    if (p && p.tag === "value" && !closing) {
-      if (tag === "shadow") p.shadows++;
-      if (tag === "block") p.blocks++;
+    if (parent && parent.tag === "value") {
+      if (tag === "shadow") parent.shadows++;
+      if (tag === "block") parent.blocks++;
     }
   }
   if (stack.length) throw new Error("audit: unclosed " + stack.map(s => s.tag).join(","));
