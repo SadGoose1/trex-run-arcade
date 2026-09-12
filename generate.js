@@ -23,21 +23,28 @@ function esc(s) {
 }
 
 // ---------------- shadows (literal pickers) ----------------
+const numOnly = (v) => {
+  if (typeof v !== "number") throw new Error("expected a number, got XML/block: " + String(v).slice(0, 60));
+  return v;
+};
 const sh = {
-  num: (n) => `<shadow type="math_number"><field name="NUM">${n}</field></shadow>`,
-  whole: (n) => `<shadow type="math_whole_number"><field name="NUM">${n}</field></shadow>`,
+  num: (n) => `<shadow type="math_number"><field name="NUM">${numOnly(n)}</field></shadow>`,
+  whole: (n) => `<shadow type="math_whole_number"><field name="NUM">${numOnly(n)}</field></shadow>`,
   bool: (b) => `<shadow type="logic_boolean"><field name="BOOL">${b}</field></shadow>`,
-  text: (t) => `<shadow type="text"><field name="TEXT">${esc(t)}</field></shadow>`,
-  time: (ms) => `<shadow type="timePicker"><field name="ms">${ms}</field></shadow>`,
-  speed: (v) => `<shadow type="spriteSpeedPicker"><field name="speed">${v}</field></shadow>`,
-  pos: (v) => `<shadow type="positionPicker"><field name="index">${v}</field></shadow>`,
-  color: (i) => `<shadow type="colorindexpicker"><field name="index">${i}</field></shadow>`,
+  text: (t) => {
+    if (typeof t !== "string") throw new Error("text shadow needs a plain string, got: " + String(t).slice(0, 60));
+    return `<shadow type="text"><field name="TEXT">${esc(t)}</field></shadow>`;
+  },
+  time: (ms) => `<shadow type="timePicker"><field name="ms">${numOnly(ms)}</field></shadow>`,
+  speed: (v) => `<shadow type="spriteSpeedPicker"><field name="speed">${numOnly(v)}</field></shadow>`,
+  pos: (v) => `<shadow type="positionPicker"><field name="index">${numOnly(v)}</field></shadow>`,
+  color: (i) => `<shadow type="colorindexpicker"><field name="index">${numOnly(i)}</field></shadow>`,
   toggle: (b) => `<shadow type="toggleOnOff"><field name="on">${b}</field></shadow>`,
   kind: (k) => `<shadow type="spritekind"><field name="MEMBER">${k}</field></shadow>`,
   winlose: (b) => `<shadow type="toggleWinLose"><field name="win">${b}</field></shadow>`,
   reporter: (name) => `<shadow type="variables_get_reporter"><field name="VAR" id="${varId[name]}">${name}</field></shadow>`,
-  percent: (p) => `<shadow type="math_number_minmax"><mutation min="0" max="Infinity" label="Percentage" precision="0"></mutation><field name="SLIDER">${p}</field></shadow>`,
-  tempo: (t) => `<shadow type="math_number_minmax"><mutation min="40" max="500" label="Tempo" precision="0"></mutation><field name="SLIDER">${t}</field></shadow>`,
+  percent: (p) => `<shadow type="math_number_minmax"><mutation min="0" max="Infinity" label="Percentage" precision="0"></mutation><field name="SLIDER">${numOnly(p)}</field></shadow>`,
+  tempo: (t) => `<shadow type="math_number_minmax"><mutation min="40" max="500" label="Tempo" precision="0"></mutation><field name="SLIDER">${numOnly(t)}</field></shadow>`,
 };
 
 function imgLiteral(rows) {
@@ -1002,7 +1009,7 @@ topBlocks.push(
               textJoinBB(sh.text(" "), listGet("lbScores", vget("bIdx")))
             ))),
           tsSetFont(vget("ts"), 6),
-          setPos(vget("ts"), 80, arith("ADD", { shadow: sh.num(62) }, { shadow: sh.num(6), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(6) }) })),
+          setPos(vget("ts"), 80, 0, arith("ADD", { shadow: sh.num(62) }, { shadow: sh.num(6), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(6) }) })),
           listSet("boardRows", vget("rCount"), vget("ts")),
           changeVar("rCount", 1),
         ],
@@ -1055,32 +1062,34 @@ topBlocks.push(
 // F_lbload / F_lbsave: settings persistence (settings build only). Names are
 // stored as one settings string per slot ("lbN0".."lbN49") because Arcade
 // blocks have no string split.
-topBlocks.push(
-  functionDef("lb_settings_load", "F_lbload", [
-    ifStmt([settingsExists("lbScores")], [
-      [
-        setVarExpr("lbScores", sh.num(0), settingsReadNumberArray("lbScores")),
-        forLoop("i", sh.whole(49), [
-          [listSet("nameArr", vget("i"), settingsReadStringBlock(textJoin("lbN", vget("i"))))],
-        ]),
-        setVarNum("lbCount", 0),
-        forLoop("i", sh.whole(49), [
-          [ifStmt([cmp("GT", { shadow: sh.num(0), block: listGet("lbScores", vget("i")) }, { shadow: sh.num(0) })], [
-            [setVarExpr("lbCount", sh.num(0), arith("ADD", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(1) }))],
-          ])],
-        ]),
-      ],
-    ]),
-  ], 2600, 1700)
-);
-topBlocks.push(
-  functionDef("lb_settings_save", "F_lbsave", [
-    settingsWriteNumberArray("lbScores"),
-    forLoop("i", sh.whole(49), [
-      [settingsWriteStringBlock(textJoin("lbN", vget("i")), listGet("nameArr", vget("i")))],
-    ]),
-  ], 2600, 2000)
-);
+if (!NO_SETTINGS) {
+  topBlocks.push(
+    functionDef("lb_settings_load", "F_lbload", [
+      ifStmt([settingsExists("lbScores")], [
+        [
+          setVarExpr("lbScores", sh.num(0), settingsReadNumberArray("lbScores")),
+          forLoop("i", sh.whole(49), [
+            [listSet("nameArr", vget("i"), settingsReadStringBlock(textJoin("lbN", vget("i"))))],
+          ]),
+          setVarNum("lbCount", 0),
+          forLoop("i", sh.whole(49), [
+            [ifStmt([cmp("GT", { shadow: sh.num(0), block: listGet("lbScores", vget("i")) }, { shadow: sh.num(0) })], [
+              [setVarExpr("lbCount", sh.num(0), arith("ADD", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(1) }))],
+            ])],
+          ]),
+        ],
+      ]),
+    ], 2600, 1700)
+  );
+  topBlocks.push(
+    functionDef("lb_settings_save", "F_lbsave", [
+      settingsWriteNumberArray("lbScores"),
+      forLoop("i", sh.whole(49), [
+        [settingsWriteStringBlock(textJoin("lbN", vget("i")), listGet("nameArr", vget("i")))],
+      ]),
+    ], 2600, 2000)
+  );
+}
 
 // ---------------- assemble XML ----------------
 let vars = "<variables>";
