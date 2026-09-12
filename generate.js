@@ -11,8 +11,8 @@ let idc = 0;
 const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
-const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud", "Board"];
-const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "lbNames", "nameArr", "tmpArr", "tmpStr", "insIdx", "letterIdx", "letters", "entrySprites", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "bIdx"];
+const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
+const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "lbNames", "nameArr", "tmpArr", "tmpStr", "insIdx", "letterIdx", "letters", "entrySprites", "boardRows", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "bIdx"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
 plainVars.forEach((v) => (varId[v] = "var_" + v));
@@ -102,8 +102,8 @@ function settingsReadString(name) {
 function stringSplit(strBlock, sep) {
   return block("string_split", value("this", sh.text(""), strBlock) + value("sep", sh.text(sep)));
 }
-function textSpriteCreate(textBlock, kind) {
-  return block("textsprite_create", `<mutation xmlns="http://www.w3.org/1999/xhtml" _expanded="0" _input_init="true"></mutation>` + value("text", sh.text(""), textBlock) + value("kind", sh.kind(kind)));
+function textSpriteCreate(textBlock) {
+  return block("textsprite_create", `<mutation xmlns="http://www.w3.org/1999/xhtml" _expanded="0" _input_init="true"></mutation>` + value("text", sh.text(""), textBlock) + value("fg", sh.color(1)));
 }
 function tsSetText(spriteXml, textBlock) {
   return block("TextSprite_setText", value("this", sh.num(0), spriteXml) + value("text", sh.text(""), textBlock));
@@ -323,7 +323,6 @@ const topBlocks = [];
 // ---------- ON START ----------
 const NO_SPLASH = !!process.env.NO_SPLASH;
 const startStmts = [
-  ...(NO_SPLASH ? [] : [splash("T-REX RUN!", "A = JUMP  DOWN = DUCK  B = DONE!")]),
   setBackgroundColor(14),
   ...(NO_SPLASH ? [setVarBool("started", "TRUE")] : []),
 ];
@@ -398,28 +397,33 @@ if (process.env.AUTOJUMP) {
 // F_eshow: name entry UI (top half) — rebuilt on every restart
 topBlocks.push(
   functionDef("lb_entry_show", "F_eshow", [
-    destroyAllOfKind("Entry"),
-    destroyAllOfKind("Board"),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("T-REX RUN!"), "Entry")),
+    forOfList("nm", vget("entrySprites"), [
+      [destroy(vget("nm"))],
+    ]),
+    forOfList("nm", vget("boardRows"), [
+      [destroy(vget("nm"))],
+    ]),
+    setVarExpr("boardRows", sh.num(0), emptyList()),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("T-REX RUN!"))),
     setPos(vget("temp"), 80, 7),
     tsSetFont(vget("temp"), 8),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("ENTER NAME"), "Entry")),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("ENTER NAME"))),
     setPos(vget("temp"), 80, 18),
     tsSetFont(vget("temp"), 6),
     setVarExpr("entrySprites", sh.num(0), emptyList()),
     forLoop("i", sh.whole(2), [
-      setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("A"), "Entry")),
+      setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("A"))),
       tsSetFont(vget("temp"), 8),
       setPos(vget("temp"), arith("ADD", { shadow: sh.num(68) }, { shadow: sh.num(12), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(12) }) }), 28),
       listPush("entrySprites", vget("temp")),
     ]),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("^"), "Entry")),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("^"))),
     setPos(vget("temp"), 68, 35),
     tsSetFont(vget("temp"), 6),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("UP/DOWN LETTER  A=OK  B=BACK"), "Entry")),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("UP/DOWN LETTER  A=OK  B=BACK"))),
     setPos(vget("temp"), 80, 42),
     tsSetFont(vget("temp"), 4),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("TOP SCORES"), "Entry")),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("TOP SCORES"))),
     setPos(vget("temp"), 80, 54),
     tsSetFont(vget("temp"), 5),
   ], 0, 6600)
@@ -428,7 +432,10 @@ topBlocks.push(
 // F_bshow: render 10 leaderboard rows for the current page (top 50 across 5 pages)
 topBlocks.push(
   functionDef("lb_board_show", "F_bshow", [
-    destroyAllOfKind("Board"),
+    forOfList("nm", vget("boardRows"), [
+      [destroy(vget("nm"))],
+    ]),
+    setVarExpr("boardRows", sh.num(0), emptyList()),
     setVarExpr("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
     forLoop("i", sh.whole(9), [
       setVarExpr("bIdx", sh.num(0), arith("ADD", { shadow: sh.num(0), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("page") }, { shadow: sh.num(10) }) }, { shadow: sh.num(0), block: vget("i") })),
@@ -444,6 +451,7 @@ topBlocks.push(
                 "Board")),
               tsSetFont(vget("temp"), 6),
               setPos(vget("temp"), 80, arith("ADD", { shadow: sh.num(62) }, { shadow: sh.num(6), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(6) }) })),
+              listPush("boardRows", vget("temp")),
             ],
           ]),
         ],
@@ -744,8 +752,13 @@ topBlocks.push(
           [
             setVarExpr("myName", sh.text(""), textJoinBB(listGet("letters", listGet("slots", sh.num(0))), textJoinBB(listGet("letters", listGet("slots", sh.num(1))), listGet("letters", listGet("slots", sh.num(2)))))),
             setVarBool("entryMode", "FALSE"),
-            destroyAllOfKind("Entry"),
-            destroyAllOfKind("Board"),
+            forOfList("nm", vget("entrySprites"), [
+              [destroy(vget("nm"))],
+            ]),
+            forOfList("nm", vget("boardRows"), [
+              [destroy(vget("nm"))],
+            ]),
+            setVarExpr("boardRows", sh.num(0), emptyList()),
             setVarBool("started", "TRUE"),
           ],
         ]),
