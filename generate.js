@@ -13,7 +13,7 @@ const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
 const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
-const plainVars = ["dino", "temp", "ts", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "nameArr", "lbCount", "lastI", "ok", "tmpS", "tmpN", "letters", "entrySprites", "boardRows", "eCount", "rCount", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "a", "pass", "bIdx", "selftestPhase"];
+const plainVars = ["dino", "temp", "ts", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "overMode", "page", "myRank", "myScore", "myName", "lbScores", "nameArr", "lbCount", "lastI", "ok", "tmpS", "tmpN", "letters", "entrySprites", "boardRows", "eCount", "rCount", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "a", "pass", "bIdx", "selftestPhase"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
 plainVars.forEach((v) => (varId[v] = "var_" + v));
@@ -429,6 +429,7 @@ topBlocks.push(
     setVarNum("nameI", 0),
     setVarNum("charI", 0),
     setVarBool("entryMode", "TRUE"),
+    setVarBool("overMode", "FALSE"),
     setVarNum("page", 0),
     setVarNum("myRank", 0),
     setVarNum("myScore", 0),
@@ -707,72 +708,105 @@ topBlocks.push(
 // ---------- JUMP (A pressed) ----------
 topBlocks.push(
   keyOnEvent("controller.A", "ControllerButtonEvent.Pressed", [
-    ifStmt([vget("entryMode")], [
-      [
-        tsSetText(letterSlot(), listGet("letters", vget("charI"))),
-        listSet("slots", vget("nameI"), vget("charI")),
-        changeVar("nameI", 1),
-        ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("nameI") }, { shadow: sh.num(3) })], [
-          [
-            setVarExpr("myName", sh.text(""), textJoinBB(listGet("letters", listGet("slots", sh.num(0))), textJoinBB(listGet("letters", listGet("slots", sh.num(1))), listGet("letters", listGet("slots", sh.num(2)))))),
-            setVarBool("entryMode", "FALSE"),
-            forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("eCount") }, { shadow: sh.num(1) }), [
-              [destroy(listGet("entrySprites", vget("i")))],
-            ]),
-            forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("rCount") }, { shadow: sh.num(1) }), [
-              [destroy(listGet("boardRows", vget("i")))],
-            ]),
-            setVarNum("eCount", 0),
-            setVarNum("rCount", 0),
-            setVarBool("started", "TRUE"),
-          ],
-        ], [
-          // not done yet: slide the caret under the next slot
-          [caretMove()],
-        ]),
-      ],
+    ifStmt([vget("overMode")], [
+      // game over screen: A restarts back to the name/score screen
+      [functionCall("restart_run", "F_rst")],
     ], [
-      ifStmt([and(vget("started"), and(vget("grounded"), not(vget("ducking"))))], [
+      ifStmt([vget("entryMode")], [
         [
-          setVarNum("vy", -200),
-          setVarBool("grounded", "FALSE"),
-          setVarBool("jumpHeld", "TRUE"),
-          stopAnims(vget("dino")),
-          setImage(vget("dino"), S.dinoJump),
-          setVel(vget("dino"), sh.speed(0), null, sh.speed(-200)),
-          playMusic("C5 E5 ", 400, "music.PlaybackMode.InBackground"),
+          tsSetText(letterSlot(), listGet("letters", vget("charI"))),
+          listSet("slots", vget("nameI"), vget("charI")),
+          changeVar("nameI", 1),
+          ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("nameI") }, { shadow: sh.num(3) })], [
+            [
+              setVarExpr("myName", sh.text(""), textJoinBB(listGet("letters", listGet("slots", sh.num(0))), textJoinBB(listGet("letters", listGet("slots", sh.num(1))), listGet("letters", listGet("slots", sh.num(2)))))),
+              setVarBool("entryMode", "FALSE"),
+              forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("eCount") }, { shadow: sh.num(1) }), [
+                [destroy(listGet("entrySprites", vget("i")))],
+              ]),
+              forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("rCount") }, { shadow: sh.num(1) }), [
+                [destroy(listGet("boardRows", vget("i")))],
+              ]),
+              setVarNum("eCount", 0),
+              setVarNum("rCount", 0),
+              setVarBool("started", "TRUE"),
+            ],
+          ], [
+            // not done yet: slide the caret under the next slot
+            [caretMove()],
+          ]),
         ],
+      ], [
+        ifStmt([and(vget("started"), and(vget("grounded"), not(vget("ducking"))))], [
+          [
+            setVarNum("vy", -200),
+            setVarBool("grounded", "FALSE"),
+            setVarBool("jumpHeld", "TRUE"),
+            stopAnims(vget("dino")),
+            setImage(vget("dino"), S.dinoJump),
+            setVel(vget("dino"), sh.speed(0), null, sh.speed(-200)),
+            playMusic("C5 E5 ", 400, "music.PlaybackMode.InBackground"),
+          ],
+        ]),
       ]),
     ]),
   ], 900, 0)
 );
-// B = DONE: finish the run voluntarily with a confetti screen
+// B = backspace on the name screen / DONE in gameplay / restart on over screen
 topBlocks.push(
   keyOnEvent("controller.B", "ControllerButtonEvent.Pressed", [
-    ifStmt([vget("entryMode")], [
-      [
-        ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("nameI") }, { shadow: sh.num(0) })], [
+    ifStmt([vget("overMode")], [
+      // game over screen: B also restarts back to the name/score screen
+      [functionCall("restart_run", "F_rst")],
+    ], [
+      ifStmt([vget("entryMode")], [
+        [
+          ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("nameI") }, { shadow: sh.num(0) })], [
+            [
+              changeVar("nameI", -1),
+              // restore the letter that was in the slot and move the caret back
+              setVarExpr("charI", sh.num(0), listGet("slots", vget("nameI"))),
+              tsSetText(letterSlot(), listGet("letters", vget("charI"))),
+              caretMove(),
+            ],
+          ]),
+        ],
+      ], [
+        ifStmt([vget("started")], [
           [
-            changeVar("nameI", -1),
-            // restore the letter that was in the slot and move the caret back
-            setVarExpr("charI", sh.num(0), listGet("slots", vget("nameI"))),
-            tsSetText(letterSlot(), listGet("letters", vget("charI"))),
-            caretMove(),
+            // file the score, then a custom over screen (no game.over reset)
+            functionCall("lb_submit", "F_lbsub"),
+            setVarBool("overMode", "TRUE"),
+            setVarBool("started", "FALSE"),
+            ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("myRank") }, { shadow: sh.num(0) })], [
+              [
+                setVar("ts", textSpriteCreate(textJoin("DONE!  RANK #", vget("myRank")))),
+                tsSetFont(vget("ts"), 8),
+                setPos(vget("ts"), 80, 25),
+                listSet("entrySprites", vget("eCount"), vget("ts")),
+                changeVar("eCount", 1),
+              ],
+            ], [
+              [
+                setVar("ts", textSpriteCreate(sh.text("DONE!"))),
+                tsSetFont(vget("ts"), 8),
+                setPos(vget("ts"), 80, 25),
+                listSet("entrySprites", vget("eCount"), vget("ts")),
+                changeVar("eCount", 1),
+              ],
+            ]),
+            setVar("ts", textSpriteCreate(textJoin("SCORE ", scoreReporter()))),
+            tsSetFont(vget("ts"), 5),
+            setPos(vget("ts"), 80, 44),
+            listSet("entrySprites", vget("eCount"), vget("ts")),
+            changeVar("eCount", 1),
+            setVar("ts", textSpriteCreate(sh.text("PRESS A"))),
+            tsSetFont(vget("ts"), 4),
+            setPos(vget("ts"), 80, 58),
+            listSet("entrySprites", vget("eCount"), vget("ts")),
+            changeVar("eCount", 1),
           ],
         ]),
-      ],
-    ], [
-      ifStmt([vget("started")], [
-        [
-          functionCall("lb_submit", "F_lbsub"),
-          ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("myRank") }, { shadow: sh.num(0) })], [
-            [setGameOverMessageBlock(textJoin("DONE!  RANK #", vget("myRank")), "true")],
-          ], [
-            [setGameOverMessage("DONE!  NOT ON BOARD", "true")],
-          ]),
-          setGameOverEffect("effects.confetti", "true"),
-          gameOver2("true"),
-        ],
       ]),
     ]),
   ], 1250, 300)
@@ -956,10 +990,26 @@ topBlocks.push(
     destroyAllOfKind("Bolt"),
     destroyAllOfKind("Cloud"),
     playMusic("E3 C3 G2 ", 200, "music.PlaybackMode.InBackground"),
-    // let one frame render so the laid-out dino is on screen when it freezes
-    block("device_pause", value("pause", sh.time(100))),
-    setGameOverMessage("GAME OVER! NICE RUN!", "false"),
-    gameOver2("false"),
+    // file the score into the board, then show a custom over screen (no
+    // game.over — its reset would re-seed the board in on-start)
+    functionCall("lb_submit", "F_lbsub"),
+    setVarBool("overMode", "TRUE"),
+    setVarBool("started", "FALSE"),
+    setVar("ts", textSpriteCreate(sh.text("GAME OVER!"))),
+    tsSetFont(vget("ts"), 8),
+    setPos(vget("ts"), 80, 25),
+    listSet("entrySprites", vget("eCount"), vget("ts")),
+    changeVar("eCount", 1),
+    setVar("ts", textSpriteCreate(textJoin("SCORE ", scoreReporter()))),
+    tsSetFont(vget("ts"), 5),
+    setPos(vget("ts"), 80, 44),
+    listSet("entrySprites", vget("eCount"), vget("ts")),
+    changeVar("eCount", 1),
+    setVar("ts", textSpriteCreate(sh.text("PRESS A"))),
+    tsSetFont(vget("ts"), 4),
+    setPos(vget("ts"), 80, 58),
+    listSet("entrySprites", vget("eCount"), vget("ts")),
+    changeVar("eCount", 1),
   ], 2600, 0)
 );
 // ---------- update_dino_image FUNCTION ----------
@@ -979,6 +1029,45 @@ topBlocks.push(
       ),
     ],
     2600, 700
+  )
+);
+
+// ---------- restart_run FUNCTION ----------
+// Back to the name/score screen WITHOUT a game reset: all variables (the
+// leaderboard!) survive; only the run state is rewound. The name slots come
+// back pre-filled because slots[] was never cleared.
+topBlocks.push(
+  functionDef(
+    "restart_run",
+    "F_rst",
+    [
+      setVarBool("overMode", "FALSE"),
+      setVarBool("entryMode", "TRUE"),
+      setVarBool("started", "FALSE"),
+      setLife(3),
+      setScore(0),
+      setVarNum("speed", 100),
+      setVarNum("effSpeed", 100),
+      setVarNum("vy", 0),
+      setVarNum("gravity", 20),
+      setVarNum("stage", 0),
+      setVarBool("jumpHeld", "FALSE"),
+      setVarBool("grounded", "TRUE"),
+      setVarBool("ducking", "FALSE"),
+      setVarNum("starMs", 0),
+      setVarNum("hitInvMs", 0),
+      setVarNum("slowMs", 0),
+      setVarBool("nightMode", "FALSE"),
+      setVarBool("blinkOn", "FALSE"),
+      setFlag(vget("dino"), "SpriteFlag.Invisible", sh.toggle("false")),
+      setPos(vget("dino"), 24, 100),
+      setVel(vget("dino"), sh.speed(0), null, sh.speed(0)),
+      functionCall("update_dino_image", "F_uddi"),
+      setBackgroundColor(14),
+      functionCall("lb_entry_show", "F_eshow"),
+      functionCall("lb_board_show", "F_bshow"),
+    ],
+    2600, 1000
   )
 );
 
@@ -1012,7 +1101,8 @@ topBlocks.push(
     listSet("entrySprites", vget("eCount"), vget("ts")),
     changeVar("eCount", 1),
     forLoop("i", sh.whole(2), [
-      setVar("ts", textSpriteCreate(sh.text("A"))),
+      // pre-fill from slots[] so a returning player sees their last name
+      setVar("ts", textSpriteCreate(listGet("letters", listGet("slots", vget("i"))))),
       tsSetFont(vget("ts"), 8),
       setPos(vget("ts"), 0, 28, null, arith("ADD", { shadow: sh.num(68) }, { shadow: sh.num(12), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(12) }) })),
       listSet("entrySprites", vget("eCount"), vget("ts")),
