@@ -97,6 +97,13 @@ function settingsReadNumberArray(name) {
 function settingsWriteString(name, strBlock) {
   return block("block_settings_write_string", value("name", sh.text(name)) + value("value", sh.text(""), strBlock));
 }
+// block-accepting variants: the key/message itself is a computed block
+function settingsReadStringBlock(nameBlock) {
+  return block("block_settings_read_string", value("name", sh.text(""), nameBlock));
+}
+function settingsWriteStringBlock(nameBlock, strBlock) {
+  return block("block_settings_write_string", value("name", sh.text(""), nameBlock) + value("value", sh.text(""), strBlock));
+}
 function settingsReadString(name) {
   return block("block_settings_read_string", value("name", sh.text(name)));
 }
@@ -312,6 +319,11 @@ function functionCall(name, functionid) {
 }
 function setGameOverMessage(text, win) {
   return block("game_setgameovermessage", value("message", sh.text(text)) + value("win", sh.winlose(win)));
+}
+// message built from a block (e.g. text_join with the rank) — must nest the
+// block under the value, not escape it into the text shadow
+function setGameOverMessageBlock(msgBlock, win) {
+  return block("game_setgameovermessage", value("message", sh.text(""), msgBlock) + value("win", sh.winlose(win)));
 }
 function setGameOverEffect(effect, win) {
   return block("game_setgameovereffect", `<field name="effect">${effect}</field>` + value("win", sh.winlose(win)));
@@ -694,7 +706,7 @@ topBlocks.push(
         [
           functionCall("lb_submit", "F_lbsub"),
           ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("myRank") }, { shadow: sh.num(0) })], [
-            [setGameOverMessage(textJoin("DONE!  RANK #", vget("myRank")), "true")],
+            [setGameOverMessageBlock(textJoin("DONE!  RANK #", vget("myRank")), "true")],
           ], [
             [setGameOverMessage("DONE!  NOT ON BOARD", "true")],
           ]),
@@ -1034,7 +1046,7 @@ topBlocks.push(
       [
         setVarExpr("lbScores", sh.num(0), settingsReadNumberArray("lbScores")),
         forLoop("i", sh.whole(49), [
-          [listSet("nameArr", vget("i"), settingsReadString(textJoin("lbN", vget("i"))))],
+          [listSet("nameArr", vget("i"), settingsReadStringBlock(textJoin("lbN", vget("i"))))],
         ]),
         setVarNum("lbCount", 0),
         forLoop("i", sh.whole(49), [
@@ -1050,7 +1062,7 @@ topBlocks.push(
   functionDef("lb_settings_save", "F_lbsave", [
     settingsWriteNumberArray("lbScores"),
     forLoop("i", sh.whole(49), [
-      [settingsWriteString(textJoin("lbN", vget("i")), listGet("nameArr", vget("i")))],
+      [settingsWriteStringBlock(textJoin("lbN", vget("i")), listGet("nameArr", vget("i")))],
     ]),
   ], 2600, 2000)
 );
