@@ -13,7 +13,7 @@ const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
 const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
-const plainVars = ["dino", "temp", "ts", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "overMode", "page", "myRank", "myScore", "myName", "lbScores", "nameArr", "lbCount", "lastI", "ok", "tmpS", "tmpN", "letters", "entrySprites", "boardRows", "eCount", "rCount", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "a", "pass", "bIdx", "selftestPhase"];
+const plainVars = ["dino", "temp", "ts", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "overMode", "page", "myRank", "myScore", "myName", "lbScores", "nameArr", "lbCount", "lastI", "ok", "tmpS", "tmpN", "vol", "volSpr", "sunSpr", "moonSpr", "letters", "entrySprites", "boardRows", "eCount", "rCount", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "a", "pass", "bIdx", "selftestPhase"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
 plainVars.forEach((v) => (varId[v] = "var_" + v));
@@ -144,12 +144,11 @@ function destroyAllOfKind(kindName) {
 function emptyList() {
   return block("lists_create_with", `<mutation items="0"></mutation>`);
 }
-// fixed 50-slot list literal (scores stay length-50 so shift-inserts never
-// depend on arrays auto-extending)
-function list50(itemShadow) {
+// fixed 5-slot list literal — the board is a TOP-5
+function list5(itemShadow) {
   let values = "";
-  for (let k = 0; k < 50; k++) values += value("ADD" + k, itemShadow);
-  return block("lists_create_with", `<mutation items="50"></mutation>` + values);
+  for (let k = 0; k < 5; k++) values += value("ADD" + k, itemShadow);
+  return block("lists_create_with", `<mutation items="5"></mutation>` + values);
 }
 // 50-slot list of the SAME block expression — used to seed sprite lists with
 // a hidden text sprite so the list decompiles as TextSprite[] (a number-seeded
@@ -424,6 +423,10 @@ topBlocks.push(
     // ground line (static, never moves: kind Projectile is not swept by the tick loop)
     setVar("temp", createSprite(S.ground, "Projectile")),
     setPos(vget("temp"), 80, 109),
+    // daytime sun (stationary; swapped for the moon at night)
+    setVar("sunSpr", createSprite(S.sun, "Projectile")),
+    setPos(vget("sunSpr"), 138, 30),
+    setVarNum("vol", 4),
     playMusic("C5 E5 G5 A5 G5 E5 C5 D5 ", 120, "music.PlaybackMode.LoopingInBackground"),
     // leaderboard + name entry (started stays false until the name is confirmed)
     setVarNum("nameI", 0),
@@ -438,8 +441,8 @@ topBlocks.push(
     setVarNum("eCount", 0),
     setVarNum("rCount", 0),
     // fixed 50-slot boards so all list IO is lists_index_get/set (proven blocks)
-    setVarExpr("lbScores", sh.num(0), list50(sh.num(0))),
-    setVarExpr("nameArr", sh.text(""), list50(sh.text(""))),
+    setVarExpr("lbScores", sh.num(0), list5(sh.num(0))),
+    setVarExpr("nameArr", sh.text(""), list5(sh.text(""))),
     listSet("lbScores", sh.whole(0), sh.num(100)),
     listSet("lbScores", sh.whole(1), sh.num(50)),
     listSet("nameArr", sh.whole(0), sh.text("AAA")),
@@ -572,22 +575,29 @@ tick.push(worldMove("Star", 1, 0, 2700));
 tick.push(worldMove("Heart", 1, 0, 2900));
 tick.push(worldMove("Bolt", 1, 0, 3100));
 tick.push(worldMove("Cloud", 2, 0, 3300));
-// day / night cycle every 150 points
+// day / night cycle every 150 points: the sun and moon swap places (both are
+// stationary Projectile-kind sprites so they hang in the sky)
 tick.push(setVar("phase", modulo(scoreReporter(), 300)));
 tick.push(
   ifStmt([and(not(vget("nightMode")), cmp("GTE", { shadow: sh.num(0), block: vget("phase") }, { shadow: sh.num(150) }))], [
     [
       setBackgroundColor(1),
       setVarBool("nightMode", "TRUE"),
-      setVar("temp", createSprite(S.moon, "Cloud")),
-      setPos(vget("temp"), 120, 10),
-      setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
+      destroy(vget("sunSpr")),
+      setVar("moonSpr", createSprite(S.moon, "Projectile")),
+      setPos(vget("moonSpr"), 128, 26),
     ],
   ])
 );
 tick.push(
   ifStmt([and(vget("nightMode"), cmp("LT", { shadow: sh.num(0), block: vget("phase") }, { shadow: sh.num(150) }))], [
-    [setBackgroundColor(14), setVarBool("nightMode", "FALSE")],
+    [
+      setBackgroundColor(14),
+      setVarBool("nightMode", "FALSE"),
+      destroy(vget("moonSpr")),
+      setVar("sunSpr", createSprite(S.sun, "Projectile")),
+      setPos(vget("sunSpr"), 138, 30),
+    ],
   ])
 );
 topBlocks.push(gameInterval(100, tick, 0, 1500));
@@ -858,22 +868,26 @@ topBlocks.push(
     ]),
   ], 1250, 900)
 );
+// ---------- VOLUME (left/right on the name screen) ----------
+// The board is a single top-5 page, so the D-pad's left/right adjusts volume.
 topBlocks.push(
   keyOnEvent("controller.left", "ControllerButtonEvent.Pressed", [
-    ifStmt([and(vget("entryMode"), cmp("GT", { shadow: sh.num(0), block: vget("page") }, { shadow: sh.num(0) }))], [
+    ifStmt([vget("entryMode")], [
       [
-        changeVar("page", -1),
-        functionCall("lb_board_show", "F_bshow"),
+        setVarExpr("vol", sh.num(0), constrain(arith("MINUS", { shadow: sh.num(0), block: vget("vol") }, { shadow: sh.num(1) }), 0, 8)),
+        block("synth_set_volume", value("volume", sh.num(255), constrain(arith("MULTIPLY", { shadow: sh.num(0), block: vget("vol") }, { shadow: sh.num(32) }), 0, 255))),
+        tsSetText(vget("volSpr"), textJoinBB(textJoinBB(sh.text("<< VOL "), vget("vol")), sh.text(" >>"))),
       ],
     ]),
   ], 1250, 1200)
 );
 topBlocks.push(
   keyOnEvent("controller.right", "ControllerButtonEvent.Pressed", [
-    ifStmt([and(vget("entryMode"), cmp("LT", { shadow: sh.num(0), block: vget("page") }, { shadow: sh.num(4) }))], [
+    ifStmt([vget("entryMode")], [
       [
-        changeVar("page", 1),
-        functionCall("lb_board_show", "F_bshow"),
+        setVarExpr("vol", sh.num(0), constrain(arith("ADD", { shadow: sh.num(0), block: vget("vol") }, { shadow: sh.num(1) }), 0, 8)),
+        block("synth_set_volume", value("volume", sh.num(255), constrain(arith("MULTIPLY", { shadow: sh.num(0), block: vget("vol") }, { shadow: sh.num(32) }), 0, 255))),
+        tsSetText(vget("volSpr"), textJoinBB(textJoinBB(sh.text("<< VOL "), vget("vol")), sh.text(" >>"))),
       ],
     ]),
   ], 1250, 1500)
@@ -1123,6 +1137,12 @@ topBlocks.push(
     tsSetFont(vget("ts"), 5),
     listSet("entrySprites", vget("eCount"), vget("ts")),
     changeVar("eCount", 1),
+    // volume indicator: << VOL n >>, adjusted with D-pad left/right here
+    setVar("volSpr", textSpriteCreate(textJoinBB(textJoinBB(sh.text("<< VOL "), vget("vol")), sh.text(" >>")))),
+    tsSetFont(vget("volSpr"), 4),
+    setPos(vget("volSpr"), 80, 103),
+    listSet("entrySprites", vget("eCount"), vget("volSpr")),
+    changeVar("eCount", 1),
   ], 0, 6600)
 );
 
@@ -1133,8 +1153,9 @@ topBlocks.push(
       [destroy(listGet("boardRows", vget("i")))],
     ]),
     setVarNum("rCount", 0),
-    forLoop("i", sh.whole(9), [
-      setVarExpr("bIdx", sh.num(0), arith("ADD", { shadow: sh.num(0), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("page") }, { shadow: sh.num(10) }) }, { shadow: sh.num(0), block: vget("i") })),
+    // top-5 board: exactly five rows
+    forLoop("i", sh.whole(4), [
+      setVarExpr("bIdx", sh.num(0), vget("i")),
       ifStmt([and(
         cmp("LT", side(vget("bIdx")), side(vget("lbCount"))),
         cmp("GT", { shadow: sh.num(0), block: listGet("lbScores", vget("bIdx")) }, { shadow: sh.num(0) })
@@ -1167,10 +1188,10 @@ topBlocks.push(
         // qualifies: board not full, or beats the current lowest entry
         setVarExpr("ok", sh.bool("FALSE"), block("logic_operation", `<field name="OP">OR</field>` +
           value("A", sh.bool("TRUE"), cmp("LT", side(vget("lbCount")), { shadow: sh.num(50) })) +
-          value("B", sh.bool("TRUE"), cmp("GT", side(vget("myScore")), { shadow: sh.num(0), block: listGet("lbScores", sh.num(49)) })))),
+          value("B", sh.bool("TRUE"), cmp("GT", side(vget("myScore")), { shadow: sh.num(0), block: listGet("lbScores", sh.num(4)) })))),
         ifStmt([vget("ok")], [
           [
-            setVarExpr("lastI", sh.num(0), constrain(vget("lbCount"), 0, 49)),
+            setVarExpr("lastI", sh.num(0), constrain(vget("lbCount"), 0, 4)),
             listSet("lbScores", vget("lastI"), vget("myScore")),
             listSet("nameArr", vget("lastI"), vget("myName")),
             ifStmt([cmp("LT", side(vget("lbCount")), { shadow: sh.num(50) })], [
@@ -1178,8 +1199,8 @@ topBlocks.push(
             ]),
             // full bubble sort (49 passes): one pass moves the new entry up
             // only one slot, so repeat until it settles (ties stay ahead of it)
-            forLoop("pass", sh.whole(48), [
-              [forLoop("a", sh.whole(48), [
+            forLoop("pass", sh.whole(4), [
+              [forLoop("a", sh.whole(3), [
                 [ifStmt([cmp("LT", { shadow: sh.num(0), block: listGet("lbScores", vget("a")) }, { shadow: sh.num(0), block: listGet("lbScores", arith("ADD", { shadow: sh.num(0), block: vget("a") }, { shadow: sh.num(1) })) })], [
                   [
                     setVarExpr("tmpS", sh.num(0), listGet("lbScores", arith("ADD", { shadow: sh.num(0), block: vget("a") }, { shadow: sh.num(1) }))),
@@ -1219,11 +1240,11 @@ if (!NO_SETTINGS) {
           setVarExpr("lbScores", sh.num(0), settingsReadNumberArray("lbScores")),
           ifStmt([cmp("GT", { shadow: sh.num(0), block: block("lists_length", value("VALUE", sh.num(0), vget("lbScores"))) }, { shadow: sh.num(0) })], [
             [
-              forLoop("i", sh.whole(49), [
+              forLoop("i", sh.whole(4), [
                 [listSet("nameArr", vget("i"), settingsReadStringBlock(textJoin("lbN", vget("i"))))],
               ]),
               setVarNum("lbCount", 0),
-              forLoop("i", sh.whole(49), [
+              forLoop("i", sh.whole(4), [
                 [ifStmt([cmp("GT", { shadow: sh.num(0), block: listGet("lbScores", vget("i")) }, { shadow: sh.num(0) })], [
                   [setVarExpr("lbCount", sh.num(0), arith("ADD", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(1) }))],
                 ])],
@@ -1237,7 +1258,7 @@ if (!NO_SETTINGS) {
   topBlocks.push(
     functionDef("lb_settings_save", "F_lbsave", [
       settingsWriteNumberArray("lbScores"),
-      forLoop("i", sh.whole(49), [
+      forLoop("i", sh.whole(4), [
         [settingsWriteStringBlock(textJoin("lbN", vget("i")), listGet("nameArr", vget("i")))],
       ]),
     ], 2600, 2000)
@@ -1275,7 +1296,7 @@ checkXml(xml);
 // corruption audit: block markup must never appear escaped inside a field,
 // and each <value> may hold at most one direct-child shadow + one direct-child
 // block (nested shadows inside blocks are fine — e.g. music_string_playable)
-if (/&lt;/.test(xml)) throw new Error("escaped markup leaked into a field");
+if (/&lt;(block|value|shadow|field|xml|next|variable)/.test(xml)) throw new Error("escaped block markup leaked into a field");
 {
   const tagRe = /<(\/?)(value|shadow|block|field)\b[^>]*?(\/?)>/g;
   const stack = []; // {tag, shadows, blocks}
