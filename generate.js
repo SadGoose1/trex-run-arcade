@@ -278,7 +278,7 @@ function caretSprite() {
   return listGet("entrySprites", sh.num(5));
 }
 function caretMove() {
-  return setPos(caretSprite(), 0, 35, null, arith("ADD", { shadow: sh.num(68) }, { shadow: sh.num(12), block: vget("nameI") }));
+  return setPos(caretSprite(), 0, 35, null, arith("ADD", { shadow: sh.num(68) }, { shadow: sh.num(12), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("nameI") }, { shadow: sh.num(12) }) }));
 }
 // ---------------- game statement builders ----------------
 function splash(title, subtitle) {
@@ -799,6 +799,9 @@ topBlocks.push(
     ]),
   ], 1250, 600)
 );
+// DOWN: in entry mode it cycles the letter backward; in gameplay it ducks.
+// pxt keeps only the LAST handler per button+event, so these MUST be one
+// merged handler (a separate letter-cycle handler gets silently dropped).
 topBlocks.push(
   keyOnEvent("controller.down", "ControllerButtonEvent.Pressed", [
     ifStmt([vget("entryMode")], [
@@ -809,6 +812,15 @@ topBlocks.push(
         ]),
         tsSetText(letterSlot(), listGet("letters", vget("charI"))),
       ],
+    ], [
+      ifStmt([and(vget("started"), and(vget("grounded"), not(vget("ducking"))))], [
+        [
+          setVarBool("ducking", "TRUE"),
+          stopAnims(vget("dino")),
+          setImage(vget("dino"), S.dinoDuck),
+          setPos(vget("dino"), 24, 104),
+        ],
+      ]),
     ]),
   ], 1250, 900)
 );
@@ -831,20 +843,6 @@ topBlocks.push(
       ],
     ]),
   ], 1250, 1500)
-);
-
-// ---------- DUCK (down pressed / released) ----------
-topBlocks.push(
-  keyOnEvent("controller.down", "ControllerButtonEvent.Pressed", [
-    ifStmt([and(vget("started"), and(vget("grounded"), not(vget("ducking"))))], [
-      [
-        setVarBool("ducking", "TRUE"),
-        stopAnims(vget("dino")),
-        setImage(vget("dino"), S.dinoDuck),
-        setPos(vget("dino"), 24, 104),
-      ],
-    ]),
-  ], 900, 400)
 );
 topBlocks.push(
   keyOnEvent("controller.down", "ControllerButtonEvent.Released", [
