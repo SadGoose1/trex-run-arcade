@@ -13,7 +13,7 @@ const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
 const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
-const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "lbNames", "nameArr", "tmpArr", "tmpStr", "insIdx", "letterIdx", "letters", "entrySprites", "boardRows", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "bIdx"];
+const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "lbNames", "nameArr", "tmpArr", "tmpStr", "insIdx", "letterIdx", "letters", "entrySprites", "boardRows", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "bIdx", "selftestPhase"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
 plainVars.forEach((v) => (varId[v] = "var_" + v));
@@ -385,6 +385,42 @@ topBlocks.push(
     functionCall("lb_board_show", "F_bshow"),
   ]))
 );
+
+// ---------- SELFTEST (test builds only) ----------
+// One-shot phases on a 2s ticker: phase 0 -> fake a finished run (score 123,
+// name ZQX) through lb_submit + lb_board_show; phase 1 -> leave entry mode and
+// start gameplay the same way the real A=OK confirm does.
+if (process.env.SELFTEST) {
+  topBlocks.push(
+    foreverLoop([
+      block("device_pause", value("pause", sh.time(2000))),
+      ifStmt([cmp("EQ", { shadow: sh.num(0), block: vget("selftestPhase") }, { shadow: sh.num(0) })], [
+        [
+          setScore(123),
+          setVar("myName", sh.text("ZQX")),
+          functionCall("lb_submit", "F_lbsub"),
+          functionCall("lb_board_show", "F_bshow"),
+          setVarNum("selftestPhase", 1),
+        ],
+      ], [
+        ifStmt([cmp("EQ", { shadow: sh.num(0), block: vget("selftestPhase") }, { shadow: sh.num(1) })], [
+          [
+            forOfList("nm", vget("entrySprites"), [
+              [destroy(vget("nm"))],
+            ]),
+            forOfList("nm", vget("boardRows"), [
+              [destroy(vget("nm"))],
+            ]),
+            setVarExpr("boardRows", sh.num(0), emptyList()),
+            setVarBool("entryMode", "FALSE"),
+            setVarBool("started", "TRUE"),
+            setVarNum("selftestPhase", 2),
+          ],
+        ]),
+      ]),
+    ], 0, 0)
+  );
+}
 
 // ---------- AUTO-JUMP (test builds only) ----------
 if (process.env.AUTOJUMP) {
@@ -1055,13 +1091,21 @@ const outDir = __dirname;
 fs.writeFileSync(path.join(outDir, "main.blocks"), xml, "utf8");
 fs.writeFileSync(path.join(outDir, "main.ts"), "\n", "utf8");
 fs.writeFileSync(path.join(outDir, "assets.json"), "", "utf8");
+// Extensions: settings-blocks only when settings persistence is enabled
+// (NO_SETTINGS session-mode ships core-only, matching the approved build);
+// arcade-text is NOT needed — textsprite blocks are core (stage build ran
+// without it) and the ext coincided with the stuck-play-overlay sim bug.
+const projectName = process.env.PROJNAME || (process.env.SELFTEST ? "T-Rex Run SelfTest" : "T-Rex Run");
+const deps = { device: "*" };
+if (!NO_SETTINGS) deps["settings-blocks"] = "github:microsoft/pxt-settings-blocks#v1.0.0";
+if (process.env.WITH_TEXT) deps["arcade-text"] = "github:microsoft/arcade-text#v1.3.0";
 fs.writeFileSync(
   path.join(outDir, "pxt.json"),
   JSON.stringify(
     {
-      name: "T-Rex Run",
+      name: projectName,
       description: "A Chrome-style dinosaur endless runner built entirely with MakeCode Arcade block code.",
-      dependencies: { device: "*", "settings-blocks": "github:microsoft/pxt-settings-blocks#v1.0.0", "arcade-text": "github:microsoft/arcade-text#v1.3.0" },
+      dependencies: deps,
       files: ["main.blocks", "main.ts", "README.md", "assets.json"],
       supportedTargets: ["arcade"],
       preferredEditor: "blocksprj",
@@ -1071,4 +1115,4 @@ fs.writeFileSync(
   ) + "\n",
   "utf8"
 );
-console.log("OK main.blocks bytes:", xml.length);
+console.log("OK main.blocks bytes:", xml.length, "deps:", Object.keys(deps).join(","), "name:", projectName);
