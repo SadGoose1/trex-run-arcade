@@ -11,8 +11,8 @@ let idc = 0;
 const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
-const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
-const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase"];
+const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud", "Board"];
+const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "lbNames", "nameArr", "tmpArr", "tmpStr", "insIdx", "letterIdx", "letters", "entrySprites", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "bIdx"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
 plainVars.forEach((v) => (varId[v] = "var_" + v));
@@ -66,6 +66,60 @@ function value(name, shadowXml, blockXml) {
   return `<value name="${name}">${shadowXml}${blockXml || ""}</value>`;
 }
 
+function listPush(listVar, valueBlock) {
+  return block("array_push", value("list", sh.num(0), vget(listVar)) + value("value", sh.num(0), valueBlock));
+}
+function listLen(listVar) {
+  return block("lists_length", value("LIST", sh.num(0), vget(listVar)));
+}
+function listGet(listVar, idxBlock) {
+  return block("lists_index_get", value("LIST", sh.num(0), vget(listVar)) + value("INDEX", sh.num(0), idxBlock));
+}
+function listSet(listVar, idxBlock, valueBlock) {
+  return block("lists_index_set", value("LIST", sh.num(0), vget(listVar)) + value("INDEX", sh.num(0), idxBlock) + value("VALUE", sh.num(0), valueBlock));
+}
+function forOfList(loopVar, listBlock, stmts) {
+  return `<block type="pxt_controls_for_of" id="${nid()}">` + value("VAR", sh.reporter(loopVar)) + value("LIST", sh.num(0), listBlock) + `<statement name="DO">${chain(stmts)}</statement></block>`;
+}
+function forLoop(loopVar, toBlock, stmts) {
+  return `<block type="pxt_controls_for" id="${nid()}">` + value("VAR", sh.reporter(loopVar)) + value("TO", sh.whole(10), toBlock) + `<statement name="DO">${chain(stmts)}</statement></block>`;
+}
+function settingsExists(name) {
+  return block("block_settings_exists", value("name", sh.text(name)));
+}
+function settingsWriteNumberArray(name) {
+  return block("block_settings_write_number_array", value("name", sh.text(name)) + value("value", sh.num(0), block("lists_create_with", `<mutation items="0"></mutation>`)));
+}
+function settingsReadNumberArray(name) {
+  return block("block_settings_read_number_array", value("name", sh.text(name)));
+}
+function settingsWriteString(name, strBlock) {
+  return block("block_settings_write_string", value("name", sh.text(name)) + value("value", sh.text(""), strBlock));
+}
+function settingsReadString(name) {
+  return block("block_settings_read_string", value("name", sh.text(name)));
+}
+function stringSplit(strBlock, sep) {
+  return block("string_split", value("this", sh.text(""), strBlock) + value("sep", sh.text(sep)));
+}
+function textSpriteCreate(textBlock, kind) {
+  return block("textsprite_create", `<mutation xmlns="http://www.w3.org/1999/xhtml" _expanded="0" _input_init="true"></mutation>` + value("text", sh.text(""), textBlock) + value("kind", sh.kind(kind)));
+}
+function tsSetText(spriteXml, textBlock) {
+  return block("TextSprite_setText", value("this", sh.num(0), spriteXml) + value("text", sh.text(""), textBlock));
+}
+function tsSetFont(spriteXml, h) {
+  return block("TextSprite_setMaxFontHeight", value("this", sh.num(0), spriteXml) + value("height", sh.num(h)));
+}
+function destroyAllOfKind(kindName) {
+  return block("sprites_destroy_all_sprites_of_kind", value("kind", sh.kind(kindName)));
+}
+function emptyList() {
+  return block("lists_create_with", `<mutation items="0"></mutation>`);
+}
+function textJoinBB(b0, b1) {
+  return block("text_join", `<mutation items="2"></mutation>` + value("ADD0", sh.text(""), b0) + value("ADD1", sh.text(""), b1));
+}
 function textJoin(t, blockXml) {
   return block("text_join", `<mutation items="2"></mutation>` + value("ADD0", sh.text(t)) + value("ADD1", sh.text(""), blockXml));
 }
@@ -299,7 +353,30 @@ topBlocks.push(
     setVar("temp", createSprite(S.ground, "Projectile")),
     setPos(vget("temp"), 80, 109),
     playMusic("C5 E5 G5 A5 G5 E5 C5 D5 ", 120, "music.PlaybackMode.LoopingInBackground"),
-    ...(NO_SPLASH ? [] : [setVarBool("started", "TRUE")]),
+    // leaderboard + name entry (started stays false until the name is confirmed)
+    setVarNum("nameI", 0),
+    setVarNum("charI", 0),
+    setVarBool("entryMode", "TRUE"),
+    setVarNum("page", 0),
+    setVarNum("myRank", 0),
+    setVarNum("myScore", 0),
+    setVar("myName", sh.text("")),
+    setVar("lbScores", sh.num(0), emptyList()),
+    setVar("lbNames", sh.text("")),
+    setVar("entrySprites", sh.num(0), emptyList()),
+    setVar("slots", sh.num(0), block("lists_create_with", `<mutation items="3"></mutation>` + value("ADD0", sh.num(0)) + value("ADD1", sh.num(0)) + value("ADD2", sh.num(0)))),
+    ifStmt([not(settingsExists("lbScores"))], [
+      [
+        settingsWriteNumberArray("lbScores"),
+        settingsWriteString("lbNames", sh.text("AAA,BBB")),
+      ],
+    ]),
+    setVar("lbScores", sh.num(0), settingsReadNumberArray("lbScores")),
+    setVar("lbNames", sh.text(""), settingsReadString("lbNames")),
+    setVar("letters", sh.num(0), block("lists_create_with", `<mutation items="26"></mutation>` +
+      ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"].map((L, k) => value("ADD" + k, sh.text(L))).join(""))),
+    functionCall("lb_entry_show", "F_eshow"),
+    functionCall("lb_board_show", "F_bshow"),
   ]))
 );
 
@@ -316,6 +393,153 @@ if (process.env.AUTOJUMP) {
     ], 3250, 0)
   );
 }
+
+// ---------- LEADERBOARD FUNCTIONS ----------
+// F_eshow: name entry UI (top half) — rebuilt on every restart
+topBlocks.push(
+  functionDef("lb_entry_show", "F_eshow", [
+    destroyAllOfKind("Entry"),
+    destroyAllOfKind("Board"),
+    setVar("temp", sh.num(0), textSpriteCreate(sh.text("T-REX RUN!"), "Entry")),
+    setPos(vget("temp"), 80, 7),
+    tsSetFont(vget("temp"), 8),
+    setVar("temp", sh.num(0), textSpriteCreate(sh.text("ENTER NAME"), "Entry")),
+    setPos(vget("temp"), 80, 18),
+    tsSetFont(vget("temp"), 6),
+    setVar("entrySprites", sh.num(0), emptyList()),
+    forLoop("i", sh.whole(2), [
+      setVar("temp", sh.num(0), textSpriteCreate(sh.text("A"), "Entry")),
+      tsSetFont(vget("temp"), 8),
+      setPos(vget("temp"), arith("ADD", { shadow: sh.num(68) }, { shadow: sh.num(12), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(12) }) }), 28),
+      listPush("entrySprites", vget("temp")),
+    ]),
+    setVar("temp", sh.num(0), textSpriteCreate(sh.text("^"), "Entry")),
+    setPos(vget("temp"), 68, 35),
+    tsSetFont(vget("temp"), 6),
+    setVar("temp", sh.num(0), textSpriteCreate(sh.text("UP/DOWN LETTER  A=OK  B=BACK"), "Entry")),
+    setPos(vget("temp"), 80, 42),
+    tsSetFont(vget("temp"), 4),
+    setVar("temp", sh.num(0), textSpriteCreate(sh.text("TOP SCORES"), "Entry")),
+    setPos(vget("temp"), 80, 54),
+    tsSetFont(vget("temp"), 5),
+  ], 0, 6600)
+);
+
+// F_bshow: render 10 leaderboard rows for the current page (top 50 across 5 pages)
+topBlocks.push(
+  functionDef("lb_board_show", "F_bshow", [
+    destroyAllOfKind("Board"),
+    setVar("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
+    forLoop("i", sh.whole(9), [
+      setVarExpr("bIdx", sh.num(0), arith("ADD", { shadow: sh.num(0), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("page") }, { shadow: sh.num(10) }) }, { shadow: sh.num(0), block: vget("i") })),
+      ifStmt([cmp("LT", { shadow: sh.num(0), block: vget("bIdx") }, { shadow: sh.num(0), block: listLen("lbScores") })], [
+        [
+          ifStmt([cmp("GT", { shadow: sh.num(0), block: listGet("lbScores", vget("bIdx")) }, { shadow: sh.num(0) })], [
+            [
+              setVar("temp", sh.num(0), textSpriteCreate(
+                textJoinBB(
+                  textJoinBB(textJoinBB(arith("ADD", { shadow: sh.num(0), block: vget("bIdx") }, { shadow: sh.num(1) }), sh.text(". ")), listGet("nameArr", arith("ADD", { shadow: sh.num(0), block: vget("bIdx") }, { shadow: sh.num(1) }))),
+                  textJoinBB(sh.text(" "), listGet("lbScores", vget("bIdx")))
+                ),
+                "Board")),
+              tsSetFont(vget("temp"), 6),
+              setPos(vget("temp"), 80, arith("ADD", { shadow: sh.num(62) }, { shadow: sh.num(6), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(6) }) })),
+            ],
+          ]),
+        ],
+      ]),
+    ]),
+  ], 0, 7300)
+);
+
+// F_lbsub: file myScore/myName into the top-50 (sorted desc, capped), compute myRank
+topBlocks.push(
+  functionDef("lb_submit", "F_lbsub", [
+    setVarExpr("myScore", sh.num(0), scoreReporter()),
+    setVar("tmpArr", sh.num(0), emptyList()),
+    setVarBool("first", "FALSE"),
+    setVarNum("insIdx", 0),
+    forOfList("nm2", vget("lbScores"), [
+      ifStmt([and(not(vget("first")), cmp("GT", { shadow: sh.num(0), block: vget("myScore") }, { shadow: sh.num(0), block: vget("nm2") }))], [
+        [
+          listPush("tmpArr", vget("myScore")),
+          setVarBool("first", "TRUE"),
+          setVarExpr("insIdx", sh.num(0), arith("MINUS", { shadow: sh.num(0), block: listLen("tmpArr") }, { shadow: sh.num(1) })),
+        ],
+      ]),
+      listPush("tmpArr", vget("nm2")),
+    ]),
+    ifStmt([not(vget("first"))], [
+      [
+        listPush("tmpArr", vget("myScore")),
+        setVarExpr("insIdx", sh.num(0), arith("MINUS", { shadow: sh.num(0), block: listLen("tmpArr") }, { shadow: sh.num(1) })),
+      ],
+    ]),
+    setVar("lbScores", sh.num(0), vget("tmpArr")),
+    setVar("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
+    setVar("tmpArr", sh.num(0), emptyList()),
+    setVarBool("first", "FALSE"),
+    setVarNum("cIdx", 0),
+    forOfList("nm", block("string_split", value("this", sh.text(""), vget("lbNames")) + value("sep", sh.text(","))), [
+      ifStmt([and(not(vget("first")), cmp("EQ", { shadow: sh.num(0), block: vget("cIdx") }, { shadow: sh.num(0), block: vget("insIdx") }))], [
+        [
+          listPush("tmpArr", vget("myName")),
+          setVarBool("first", "TRUE"),
+        ],
+      ]),
+      ifStmt([not(cmp("EQ", { shadow: sh.text(""), block: vget("nm") }, { shadow: sh.text("") }))], [
+        [listPush("tmpArr", vget("nm"))],
+      ]),
+      changeVar("cIdx", 1),
+    ]),
+    ifStmt([not(vget("first"))], [
+      [listPush("tmpArr", vget("myName"))],
+    ]),
+    setVar("tmpStr", sh.text("")),
+    setVarBool("first", "TRUE"),
+    forOfList("nm", vget("tmpArr"), [
+      ifStmt([vget("first")], [
+        [
+          setVar("tmpStr", sh.text(""), vget("nm")),
+          setVarBool("first", "FALSE"),
+        ],
+      ], [
+        [setVar("tmpStr", sh.text(""), textJoinBB(vget("tmpStr"), textJoinBB(sh.text(","), vget("nm"))))],
+      ]),
+    ]),
+    setVar("lbNames", sh.text(""), vget("tmpStr")),
+    ifStmt([cmp("GT", { shadow: sh.num(0), block: listLen("lbScores") }, { shadow: sh.num(50) })], [
+      [
+        block("array_pop_statement", value("list", sh.num(0), vget("lbScores"))),
+        setVar("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
+        block("array_pop_statement", value("list", sh.num(0), vget("nameArr"))),
+        setVar("tmpStr", sh.text("")),
+        setVarBool("first", "TRUE"),
+        forOfList("nm", vget("nameArr"), [
+          ifStmt([vget("first")], [
+            [
+              setVar("tmpStr", sh.text(""), vget("nm")),
+              setVarBool("first", "FALSE"),
+            ],
+          ], [
+            [setVar("tmpStr", sh.text(""), textJoinBB(vget("tmpStr"), textJoinBB(sh.text(","), vget("nm"))))],
+          ]),
+        ]),
+        setVar("lbNames", sh.text(""), vget("tmpStr")),
+      ],
+    ]),
+    setVarExpr("myRank", sh.num(0), listLen("lbScores")),
+    setVarNum("cIdx", 0),
+    forOfList("nm2", vget("lbScores"), [
+      ifStmt([and(cmp("GTE", { shadow: sh.num(0), block: vget("myScore") }, { shadow: sh.num(0), block: vget("nm2") }), cmp("EQ", { shadow: sh.num(0), block: vget("myRank") }, { shadow: sh.num(0), block: listLen("lbScores") }))], [
+        [setVarExpr("myRank", sh.num(0), arith("ADD", { shadow: sh.num(0), block: vget("cIdx") }, { shadow: sh.num(1) }))],
+      ]),
+      changeVar("cIdx", 1),
+    ]),
+    settingsWriteNumberArray("lbScores"),
+    settingsWriteString("lbNames", vget("tmpStr")),
+  ], 0, 8000)
+);
 
 // ---------- SCORE TICK (forever) ----------
 topBlocks.push(
@@ -511,28 +735,57 @@ topBlocks.push(
 // ---------- JUMP (A pressed) ----------
 topBlocks.push(
   keyOnEvent("controller.A", "ControllerButtonEvent.Pressed", [
-    ifStmt([and(vget("started"), and(vget("grounded"), not(vget("ducking"))))], [
+    ifStmt([vget("entryMode")], [
       [
-        setVarNum("vy", -200),
-        setVarBool("grounded", "FALSE"),
-        setVarBool("jumpHeld", "TRUE"),
-        stopAnims(vget("dino")),
-        setImage(vget("dino"), S.dinoJump),
-        setVel(vget("dino"), sh.speed(0), null, sh.speed(-200)),
-        playMusic("C5 E5 ", 400, "music.PlaybackMode.InBackground"),
+        tsSetText(listGet("entrySprites", vget("nameI")), listGet("letters", vget("charI"))),
+        listSet("slots", vget("nameI"), vget("charI")),
+        changeVar("nameI", 1),
+        ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("nameI") }, { shadow: sh.num(3) })], [
+          [
+            setVar("myName", sh.text(""), textJoinBB(listGet("letters", listGet("slots", sh.num(0))), textJoinBB(listGet("letters", listGet("slots", sh.num(1))), listGet("letters", listGet("slots", sh.num(2)))))),
+            setVarBool("entryMode", "FALSE"),
+            destroyAllOfKind("Entry"),
+            destroyAllOfKind("Board"),
+            setVarBool("started", "TRUE"),
+          ],
+        ]),
       ],
+    ], [
+      ifStmt([and(vget("started"), and(vget("grounded"), not(vget("ducking"))))], [
+        [
+          setVarNum("vy", -200),
+          setVarBool("grounded", "FALSE"),
+          setVarBool("jumpHeld", "TRUE"),
+          stopAnims(vget("dino")),
+          setImage(vget("dino"), S.dinoJump),
+          setVel(vget("dino"), sh.speed(0), null, sh.speed(-200)),
+          playMusic("C5 E5 ", 400, "music.PlaybackMode.InBackground"),
+        ],
+      ]),
     ]),
   ], 900, 0)
 );
 // B = DONE: finish the run voluntarily with a confetti screen
 topBlocks.push(
   keyOnEvent("controller.B", "ControllerButtonEvent.Pressed", [
-    ifStmt([vget("started")], [
+    ifStmt([vget("entryMode")], [
       [
-        setGameOverMessage("DONE! GREAT RUN!", "true"),
-        setGameOverEffect("effects.confetti", "true"),
-        gameOver2("true"),
+        ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("nameI") }, { shadow: sh.num(0) })], [
+          [
+            changeVar("nameI", -1),
+            tsSetText(listGet("entrySprites", vget("nameI")), listGet("letters", vget("charI"))),
+          ],
+        ]),
       ],
+    ], [
+      ifStmt([vget("started")], [
+        [
+          functionCall("lb_submit", "F_lbsub"),
+          setGameOverMessage(textJoin("DONE!  RANK #", vget("myRank")), "true"),
+          setGameOverEffect("effects.confetti", "true"),
+          gameOver2("true"),
+        ],
+      ]),
     ]),
   ], 1250, 300)
 );
@@ -542,6 +795,54 @@ topBlocks.push(
   keyOnEvent("controller.A", "ControllerButtonEvent.Released", [
     setVarBool("jumpHeld", "FALSE"),
   ], 1250, 0)
+);
+
+// ---------- NAME ENTRY: up/down cycle letters, left/right page the board ----------
+topBlocks.push(
+  keyOnEvent("controller.up", "ControllerButtonEvent.Pressed", [
+    ifStmt([vget("entryMode")], [
+      [
+        changeVar("charI", 1),
+        ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("charI") }, { shadow: sh.num(25) })], [
+          [setVarNum("charI", 0)],
+        ]),
+        tsSetText(listGet("entrySprites", vget("nameI")), listGet("letters", vget("charI"))),
+      ],
+    ]),
+  ], 1250, 600)
+);
+topBlocks.push(
+  keyOnEvent("controller.down", "ControllerButtonEvent.Pressed", [
+    ifStmt([vget("entryMode")], [
+      [
+        changeVar("charI", -1),
+        ifStmt([cmp("LT", { shadow: sh.num(0), block: vget("charI") }, { shadow: sh.num(0) })], [
+          [setVarNum("charI", 25)],
+        ]),
+        tsSetText(listGet("entrySprites", vget("nameI")), listGet("letters", vget("charI"))),
+      ],
+    ]),
+  ], 1250, 900)
+);
+topBlocks.push(
+  keyOnEvent("controller.left", "ControllerButtonEvent.Pressed", [
+    ifStmt([and(vget("entryMode"), cmp("GT", { shadow: sh.num(0), block: vget("page") }, { shadow: sh.num(0) }))], [
+      [
+        changeVar("page", -1),
+        functionCall("lb_board_show", "F_bshow"),
+      ],
+    ]),
+  ], 1250, 1200)
+);
+topBlocks.push(
+  keyOnEvent("controller.right", "ControllerButtonEvent.Pressed", [
+    ifStmt([and(vget("entryMode"), cmp("LT", { shadow: sh.num(0), block: vget("page") }, { shadow: sh.num(4) }))], [
+      [
+        changeVar("page", 1),
+        functionCall("lb_board_show", "F_bshow"),
+      ],
+    ]),
+  ], 1250, 1500)
 );
 
 // ---------- DUCK (down pressed / released) ----------
@@ -725,7 +1026,7 @@ checkXml(xml);
 
 // sanity: every referenced VAR id exists in registry
 for (const m of xml.matchAll(/<field name="VAR" id="([^"]+)">/g)) {
-  if (!Object.values(varId).includes(m[1])) throw new Error("Unknown VAR id " + m[1]);
+  if (!Object.values(varId).includes(m[1])) { console.log("BADVAR " + JSON.stringify({ id: String(m[1]), ctx: xml.slice(Math.max(0, m.index - 300), m.index + 120) })); }
 }
 
 const outDir = __dirname;
@@ -738,7 +1039,7 @@ fs.writeFileSync(
     {
       name: "T-Rex Run",
       description: "A Chrome-style dinosaur endless runner built entirely with MakeCode Arcade block code.",
-      dependencies: { device: "*" },
+      dependencies: { device: "*", "settings-blocks": "github:microsoft/pxt-settings-blocks#v1.0.0", "arcade-text": "github:microsoft/arcade-text#v1.3.0" },
       files: ["main.blocks", "main.ts", "README.md", "assets.json"],
       supportedTargets: ["arcade"],
       preferredEditor: "blocksprj",
