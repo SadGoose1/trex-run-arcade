@@ -361,19 +361,19 @@ topBlocks.push(
     setVarNum("myRank", 0),
     setVarNum("myScore", 0),
     setVar("myName", sh.text("")),
-    setVar("lbScores", sh.num(0), emptyList()),
+    setVarExpr("lbScores", sh.num(0), emptyList()),
     setVar("lbNames", sh.text("")),
-    setVar("entrySprites", sh.num(0), emptyList()),
-    setVar("slots", sh.num(0), block("lists_create_with", `<mutation items="3"></mutation>` + value("ADD0", sh.num(0)) + value("ADD1", sh.num(0)) + value("ADD2", sh.num(0)))),
+    setVarExpr("entrySprites", sh.num(0), emptyList()),
+    setVarExpr("slots", sh.num(0), block("lists_create_with", `<mutation items="3"></mutation>` + value("ADD0", sh.num(0)) + value("ADD1", sh.num(0)) + value("ADD2", sh.num(0)))),
     ifStmt([not(settingsExists("lbScores"))], [
       [
         settingsWriteNumberArray("lbScores"),
         settingsWriteString("lbNames", sh.text("AAA,BBB")),
       ],
     ]),
-    setVar("lbScores", sh.num(0), settingsReadNumberArray("lbScores")),
-    setVar("lbNames", sh.text(""), settingsReadString("lbNames")),
-    setVar("letters", sh.num(0), block("lists_create_with", `<mutation items="26"></mutation>` +
+    setVarExpr("lbScores", sh.num(0), settingsReadNumberArray("lbScores")),
+    setVarExpr("lbNames", sh.text(""), settingsReadString("lbNames")),
+    setVarExpr("letters", sh.num(0), block("lists_create_with", `<mutation items="26"></mutation>` +
       ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"].map((L, k) => value("ADD" + k, sh.text(L))).join(""))),
     functionCall("lb_entry_show", "F_eshow"),
     functionCall("lb_board_show", "F_bshow"),
@@ -400,26 +400,26 @@ topBlocks.push(
   functionDef("lb_entry_show", "F_eshow", [
     destroyAllOfKind("Entry"),
     destroyAllOfKind("Board"),
-    setVar("temp", sh.num(0), textSpriteCreate(sh.text("T-REX RUN!"), "Entry")),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("T-REX RUN!"), "Entry")),
     setPos(vget("temp"), 80, 7),
     tsSetFont(vget("temp"), 8),
-    setVar("temp", sh.num(0), textSpriteCreate(sh.text("ENTER NAME"), "Entry")),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("ENTER NAME"), "Entry")),
     setPos(vget("temp"), 80, 18),
     tsSetFont(vget("temp"), 6),
-    setVar("entrySprites", sh.num(0), emptyList()),
+    setVarExpr("entrySprites", sh.num(0), emptyList()),
     forLoop("i", sh.whole(2), [
-      setVar("temp", sh.num(0), textSpriteCreate(sh.text("A"), "Entry")),
+      setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("A"), "Entry")),
       tsSetFont(vget("temp"), 8),
       setPos(vget("temp"), arith("ADD", { shadow: sh.num(68) }, { shadow: sh.num(12), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(12) }) }), 28),
       listPush("entrySprites", vget("temp")),
     ]),
-    setVar("temp", sh.num(0), textSpriteCreate(sh.text("^"), "Entry")),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("^"), "Entry")),
     setPos(vget("temp"), 68, 35),
     tsSetFont(vget("temp"), 6),
-    setVar("temp", sh.num(0), textSpriteCreate(sh.text("UP/DOWN LETTER  A=OK  B=BACK"), "Entry")),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("UP/DOWN LETTER  A=OK  B=BACK"), "Entry")),
     setPos(vget("temp"), 80, 42),
     tsSetFont(vget("temp"), 4),
-    setVar("temp", sh.num(0), textSpriteCreate(sh.text("TOP SCORES"), "Entry")),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("TOP SCORES"), "Entry")),
     setPos(vget("temp"), 80, 54),
     tsSetFont(vget("temp"), 5),
   ], 0, 6600)
@@ -429,14 +429,14 @@ topBlocks.push(
 topBlocks.push(
   functionDef("lb_board_show", "F_bshow", [
     destroyAllOfKind("Board"),
-    setVar("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
+    setVarExpr("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
     forLoop("i", sh.whole(9), [
       setVarExpr("bIdx", sh.num(0), arith("ADD", { shadow: sh.num(0), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("page") }, { shadow: sh.num(10) }) }, { shadow: sh.num(0), block: vget("i") })),
       ifStmt([cmp("LT", { shadow: sh.num(0), block: vget("bIdx") }, { shadow: sh.num(0), block: listLen("lbScores") })], [
         [
           ifStmt([cmp("GT", { shadow: sh.num(0), block: listGet("lbScores", vget("bIdx")) }, { shadow: sh.num(0) })], [
             [
-              setVar("temp", sh.num(0), textSpriteCreate(
+              setVarExpr("temp", sh.num(0), textSpriteCreate(
                 textJoinBB(
                   textJoinBB(textJoinBB(arith("ADD", { shadow: sh.num(0), block: vget("bIdx") }, { shadow: sh.num(1) }), sh.text(". ")), listGet("nameArr", arith("ADD", { shadow: sh.num(0), block: vget("bIdx") }, { shadow: sh.num(1) }))),
                   textJoinBB(sh.text(" "), listGet("lbScores", vget("bIdx")))
@@ -456,7 +456,7 @@ topBlocks.push(
 topBlocks.push(
   functionDef("lb_submit", "F_lbsub", [
     setVarExpr("myScore", sh.num(0), scoreReporter()),
-    setVar("tmpArr", sh.num(0), emptyList()),
+    setVarExpr("tmpArr", sh.num(0), emptyList()),
     setVarBool("first", "FALSE"),
     setVarNum("insIdx", 0),
     forOfList("nm2", vget("lbScores"), [
@@ -475,9 +475,9 @@ topBlocks.push(
         setVarExpr("insIdx", sh.num(0), arith("MINUS", { shadow: sh.num(0), block: listLen("tmpArr") }, { shadow: sh.num(1) })),
       ],
     ]),
-    setVar("lbScores", sh.num(0), vget("tmpArr")),
-    setVar("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
-    setVar("tmpArr", sh.num(0), emptyList()),
+    setVarExpr("lbScores", sh.num(0), vget("tmpArr")),
+    setVarExpr("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
+    setVarExpr("tmpArr", sh.num(0), emptyList()),
     setVarBool("first", "FALSE"),
     setVarNum("cIdx", 0),
     forOfList("nm", block("string_split", value("this", sh.text(""), vget("lbNames")) + value("sep", sh.text(","))), [
@@ -500,32 +500,32 @@ topBlocks.push(
     forOfList("nm", vget("tmpArr"), [
       ifStmt([vget("first")], [
         [
-          setVar("tmpStr", sh.text(""), vget("nm")),
+          setVarExpr("tmpStr", sh.text(""), vget("nm")),
           setVarBool("first", "FALSE"),
         ],
       ], [
-        [setVar("tmpStr", sh.text(""), textJoinBB(vget("tmpStr"), textJoinBB(sh.text(","), vget("nm"))))],
+        [setVarExpr("tmpStr", sh.text(""), textJoinBB(vget("tmpStr"), textJoinBB(sh.text(","), vget("nm"))))],
       ]),
     ]),
-    setVar("lbNames", sh.text(""), vget("tmpStr")),
+    setVarExpr("lbNames", sh.text(""), vget("tmpStr")),
     ifStmt([cmp("GT", { shadow: sh.num(0), block: listLen("lbScores") }, { shadow: sh.num(50) })], [
       [
         block("array_pop_statement", value("list", sh.num(0), vget("lbScores"))),
-        setVar("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
+        setVarExpr("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
         block("array_pop_statement", value("list", sh.num(0), vget("nameArr"))),
         setVar("tmpStr", sh.text("")),
         setVarBool("first", "TRUE"),
         forOfList("nm", vget("nameArr"), [
           ifStmt([vget("first")], [
             [
-              setVar("tmpStr", sh.text(""), vget("nm")),
+              setVarExpr("tmpStr", sh.text(""), vget("nm")),
               setVarBool("first", "FALSE"),
             ],
           ], [
-            [setVar("tmpStr", sh.text(""), textJoinBB(vget("tmpStr"), textJoinBB(sh.text(","), vget("nm"))))],
+            [setVarExpr("tmpStr", sh.text(""), textJoinBB(vget("tmpStr"), textJoinBB(sh.text(","), vget("nm"))))],
           ]),
         ]),
-        setVar("lbNames", sh.text(""), vget("tmpStr")),
+        setVarExpr("lbNames", sh.text(""), vget("tmpStr")),
       ],
     ]),
     setVarExpr("myRank", sh.num(0), listLen("lbScores")),
@@ -742,7 +742,7 @@ topBlocks.push(
         changeVar("nameI", 1),
         ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("nameI") }, { shadow: sh.num(3) })], [
           [
-            setVar("myName", sh.text(""), textJoinBB(listGet("letters", listGet("slots", sh.num(0))), textJoinBB(listGet("letters", listGet("slots", sh.num(1))), listGet("letters", listGet("slots", sh.num(2)))))),
+            setVarExpr("myName", sh.text(""), textJoinBB(listGet("letters", listGet("slots", sh.num(0))), textJoinBB(listGet("letters", listGet("slots", sh.num(1))), listGet("letters", listGet("slots", sh.num(2)))))),
             setVarBool("entryMode", "FALSE"),
             destroyAllOfKind("Entry"),
             destroyAllOfKind("Board"),
