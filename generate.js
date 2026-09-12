@@ -1104,14 +1104,13 @@ const outDir = __dirname;
 fs.writeFileSync(path.join(outDir, "main.blocks"), xml, "utf8");
 fs.writeFileSync(path.join(outDir, "main.ts"), "\n", "utf8");
 fs.writeFileSync(path.join(outDir, "assets.json"), "", "utf8");
-// Extensions: settings-blocks only when settings persistence is enabled
-// (NO_SETTINGS session-mode ships core-only, matching the approved build);
-// arcade-text is NOT needed — textsprite blocks are core (stage build ran
-// without it) and the ext coincided with the stuck-play-overlay sim bug.
+// Extensions: arcade-text is REQUIRED — textsprite_create/setText/setFont
+// live in it, and without it those blocks are unknown and abort the whole
+// workspace load. settings-blocks only when settings persistence is enabled
+// (NO_SETTINGS session-mode stays ext-light).
 const projectName = process.env.PROJNAME || (process.env.SELFTEST ? "T-Rex Run SelfTest" : "T-Rex Run");
-const deps = { device: "*" };
+const deps = { device: "*", "arcade-text": "github:microsoft/arcade-text#v1.3.0" };
 if (!NO_SETTINGS) deps["settings-blocks"] = "github:microsoft/pxt-settings-blocks#v1.0.0";
-if (process.env.WITH_TEXT) deps["arcade-text"] = "github:microsoft/arcade-text#v1.3.0";
 fs.writeFileSync(
   path.join(outDir, "pxt.json"),
   JSON.stringify(
