@@ -13,7 +13,7 @@ const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
 const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
-const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "lbNames", "nameArr", "tmpArr", "tmpStr", "insIdx", "letterIdx", "letters", "entrySprites", "boardRows", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "bIdx", "selftestPhase"];
+const plainVars = ["dino", "temp", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "page", "myRank", "myScore", "myName", "lbScores", "nameArr", "lbCount", "lastI", "insIdx", "letters", "entrySprites", "boardRows", "eCount", "rCount", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "bIdx", "selftestPhase"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
 plainVars.forEach((v) => (varId[v] = "var_" + v));
@@ -118,6 +118,16 @@ function destroyAllOfKind(kindName) {
 function emptyList() {
   return block("lists_create_with", `<mutation items="0"></mutation>`);
 }
+// fixed 50-slot list literal (scores stay length-50 so shift-inserts never
+// depend on arrays auto-extending)
+function list50(itemShadow) {
+  let values = "";
+  for (let k = 0; k < 50; k++) values += value("ADD" + k, itemShadow);
+  return block("lists_create_with", `<mutation items="50"></mutation>` + values);
+}
+function side(v) {
+  return { shadow: sh.num(0), block: v };
+}
 function textJoinBB(b0, b1) {
   return block("text_join", `<mutation items="2"></mutation>` + value("ADD0", sh.text(""), b0) + value("ADD1", sh.text(""), b1));
 }
@@ -171,6 +181,9 @@ function cmp(op, aSide, bSide) {
 }
 function and(a, b) {
   return block("logic_operation", `<field name="OP">AND</field>` + value("A", sh.bool("TRUE"), a) + value("B", sh.bool("TRUE"), b));
+}
+function or(a, b) {
+  return block("logic_operation", `<field name="OP">OR</field>` + value("A", sh.bool("TRUE"), a) + value("B", sh.bool("TRUE"), b));
 }
 function not(x) {
   return block("logic_negate", value("BOOL", sh.bool("TRUE"), x));
@@ -361,26 +374,23 @@ topBlocks.push(
     setVarNum("myRank", 0),
     setVarNum("myScore", 0),
     setVar("myName", sh.text("")),
-    setVarExpr("lbScores", sh.num(0), emptyList()),
-    setVar("lbNames", sh.text("")),
-    setVarExpr("entrySprites", sh.num(0), emptyList()),
+    setVarNum("lbCount", 0),
+    setVarNum("eCount", 0),
+    setVarNum("rCount", 0),
+    // fixed 50-slot boards so all list IO is lists_index_get/set (proven blocks)
+    setVarExpr("lbScores", sh.num(0), list50(sh.num(0))),
+    setVarExpr("nameArr", sh.text(""), list50(sh.text(""))),
+    listSet("lbScores", sh.whole(0), sh.num(100)),
+    listSet("lbScores", sh.whole(1), sh.num(50)),
+    listSet("nameArr", sh.whole(0), sh.text("AAA")),
+    listSet("nameArr", sh.whole(1), sh.text("BBB")),
+    setVarNum("lbCount", 2),
+    setVarExpr("entrySprites", sh.num(0), list50(sh.num(0))),
+    setVarExpr("boardRows", sh.num(0), list50(sh.num(0))),
     setVarExpr("slots", sh.num(0), block("lists_create_with", `<mutation items="3"></mutation>` + value("ADD0", sh.num(0)) + value("ADD1", sh.num(0)) + value("ADD2", sh.num(0)))),
-    ...(NO_SETTINGS ? [] : [
-      ifStmt([not(settingsExists("lbScores"))], [
-        [
-          settingsWriteNumberArray("lbScores"),
-          settingsWriteString("lbNames", sh.text("AAA,BBB")),
-        ],
-      ]),
-      setVarExpr("lbScores", sh.num(0), settingsReadNumberArray("lbScores")),
-      setVarExpr("lbNames", sh.text(""), settingsReadString("lbNames")),
-    ]),
-    ...(NO_SETTINGS ? [
-      setVarExpr("lbScores", sh.num(0), block("lists_create_with", `<mutation items="2"></mutation>` + value("ADD0", sh.num(100)) + value("ADD1", sh.num(50)))),
-      setVarExpr("lbNames", sh.text(""), sh.text("AAA,BBB")),
-    ] : []),
     setVarExpr("letters", sh.num(0), block("lists_create_with", `<mutation items="26"></mutation>` +
       ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"].map((L, k) => value("ADD" + k, sh.text(L))).join(""))),
+    ...(NO_SETTINGS ? [] : [functionCall("lb_settings_load", "F_lbload")]),
     functionCall("lb_entry_show", "F_eshow"),
     functionCall("lb_board_show", "F_bshow"),
   ]))
@@ -405,13 +415,14 @@ if (process.env.SELFTEST) {
       ], [
         ifStmt([cmp("EQ", { shadow: sh.num(0), block: vget("selftestPhase") }, { shadow: sh.num(1) })], [
           [
-            forOfList("nm", vget("entrySprites"), [
-              [destroy(vget("nm"))],
+            forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("eCount") }, { shadow: sh.num(1) }), [
+              [destroy(listGet("entrySprites", vget("i")))],
             ]),
-            forOfList("nm", vget("boardRows"), [
-              [destroy(vget("nm"))],
+            forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("rCount") }, { shadow: sh.num(1) }), [
+              [destroy(listGet("boardRows", vget("i")))],
             ]),
-            setVarExpr("boardRows", sh.num(0), emptyList()),
+            setVarNum("eCount", 0),
+            setVarNum("rCount", 0),
             setVarBool("entryMode", "FALSE"),
             setVarBool("started", "TRUE"),
             setVarNum("selftestPhase", 2),
@@ -435,164 +446,6 @@ if (process.env.AUTOJUMP) {
     ], 3250, 0)
   );
 }
-
-// ---------- LEADERBOARD FUNCTIONS ----------
-// F_eshow: name entry UI (top half) — rebuilt on every restart
-topBlocks.push(
-  functionDef("lb_entry_show", "F_eshow", [
-    forOfList("nm", vget("entrySprites"), [
-      [destroy(vget("nm"))],
-    ]),
-    forOfList("nm", vget("boardRows"), [
-      [destroy(vget("nm"))],
-    ]),
-    setVarExpr("boardRows", sh.num(0), emptyList()),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("T-REX RUN!"))),
-    setPos(vget("temp"), 80, 7),
-    tsSetFont(vget("temp"), 8),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("ENTER NAME"))),
-    setPos(vget("temp"), 80, 18),
-    tsSetFont(vget("temp"), 6),
-    setVarExpr("entrySprites", sh.num(0), emptyList()),
-    forLoop("i", sh.whole(2), [
-      setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("A"))),
-      tsSetFont(vget("temp"), 8),
-      setPos(vget("temp"), arith("ADD", { shadow: sh.num(68) }, { shadow: sh.num(12), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(12) }) }), 28),
-      listPush("entrySprites", vget("temp")),
-    ]),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("^"))),
-    setPos(vget("temp"), 68, 35),
-    tsSetFont(vget("temp"), 6),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("UP/DOWN LETTER  A=OK  B=BACK"))),
-    setPos(vget("temp"), 80, 42),
-    tsSetFont(vget("temp"), 4),
-    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("TOP SCORES"))),
-    setPos(vget("temp"), 80, 54),
-    tsSetFont(vget("temp"), 5),
-  ], 0, 6600)
-);
-
-// F_bshow: render 10 leaderboard rows for the current page (top 50 across 5 pages)
-topBlocks.push(
-  functionDef("lb_board_show", "F_bshow", [
-    forOfList("nm", vget("boardRows"), [
-      [destroy(vget("nm"))],
-    ]),
-    setVarExpr("boardRows", sh.num(0), emptyList()),
-    setVarExpr("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
-    forLoop("i", sh.whole(9), [
-      setVarExpr("bIdx", sh.num(0), arith("ADD", { shadow: sh.num(0), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("page") }, { shadow: sh.num(10) }) }, { shadow: sh.num(0), block: vget("i") })),
-      ifStmt([cmp("LT", { shadow: sh.num(0), block: vget("bIdx") }, { shadow: sh.num(0), block: listLen("lbScores") })], [
-        [
-          ifStmt([cmp("GT", { shadow: sh.num(0), block: listGet("lbScores", vget("bIdx")) }, { shadow: sh.num(0) })], [
-            [
-              setVarExpr("temp", sh.num(0), textSpriteCreate(
-                textJoinBB(
-                  textJoinBB(textJoinBB(arith("ADD", { shadow: sh.num(0), block: vget("bIdx") }, { shadow: sh.num(1) }), sh.text(". ")), listGet("nameArr", arith("ADD", { shadow: sh.num(0), block: vget("bIdx") }, { shadow: sh.num(1) }))),
-                  textJoinBB(sh.text(" "), listGet("lbScores", vget("bIdx")))
-                ),
-                "Board")),
-              tsSetFont(vget("temp"), 6),
-              setPos(vget("temp"), 80, arith("ADD", { shadow: sh.num(62) }, { shadow: sh.num(6), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(6) }) })),
-              listPush("boardRows", vget("temp")),
-            ],
-          ]),
-        ],
-      ]),
-    ]),
-  ], 0, 7300)
-);
-
-// F_lbsub: file myScore/myName into the top-50 (sorted desc, capped), compute myRank
-topBlocks.push(
-  functionDef("lb_submit", "F_lbsub", [
-    setVarExpr("myScore", sh.num(0), scoreReporter()),
-    setVarExpr("tmpArr", sh.num(0), emptyList()),
-    setVarBool("first", "FALSE"),
-    setVarNum("insIdx", 0),
-    forOfList("nm2", vget("lbScores"), [
-      ifStmt([and(not(vget("first")), cmp("GT", { shadow: sh.num(0), block: vget("myScore") }, { shadow: sh.num(0), block: vget("nm2") }))], [
-        [
-          listPush("tmpArr", vget("myScore")),
-          setVarBool("first", "TRUE"),
-          setVarExpr("insIdx", sh.num(0), arith("MINUS", { shadow: sh.num(0), block: listLen("tmpArr") }, { shadow: sh.num(1) })),
-        ],
-      ]),
-      listPush("tmpArr", vget("nm2")),
-    ]),
-    ifStmt([not(vget("first"))], [
-      [
-        listPush("tmpArr", vget("myScore")),
-        setVarExpr("insIdx", sh.num(0), arith("MINUS", { shadow: sh.num(0), block: listLen("tmpArr") }, { shadow: sh.num(1) })),
-      ],
-    ]),
-    setVarExpr("lbScores", sh.num(0), vget("tmpArr")),
-    setVarExpr("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
-    setVarExpr("tmpArr", sh.num(0), emptyList()),
-    setVarBool("first", "FALSE"),
-    setVarNum("cIdx", 0),
-    forOfList("nm", block("string_split", value("this", sh.text(""), vget("lbNames")) + value("sep", sh.text(","))), [
-      ifStmt([and(not(vget("first")), cmp("EQ", { shadow: sh.num(0), block: vget("cIdx") }, { shadow: sh.num(0), block: vget("insIdx") }))], [
-        [
-          listPush("tmpArr", vget("myName")),
-          setVarBool("first", "TRUE"),
-        ],
-      ]),
-      ifStmt([not(cmp("EQ", { shadow: sh.text(""), block: vget("nm") }, { shadow: sh.text("") }))], [
-        [listPush("tmpArr", vget("nm"))],
-      ]),
-      changeVar("cIdx", 1),
-    ]),
-    ifStmt([not(vget("first"))], [
-      [listPush("tmpArr", vget("myName"))],
-    ]),
-    setVar("tmpStr", sh.text("")),
-    setVarBool("first", "TRUE"),
-    forOfList("nm", vget("tmpArr"), [
-      ifStmt([vget("first")], [
-        [
-          setVarExpr("tmpStr", sh.text(""), vget("nm")),
-          setVarBool("first", "FALSE"),
-        ],
-      ], [
-        [setVarExpr("tmpStr", sh.text(""), textJoinBB(vget("tmpStr"), textJoinBB(sh.text(","), vget("nm"))))],
-      ]),
-    ]),
-    setVarExpr("lbNames", sh.text(""), vget("tmpStr")),
-    ifStmt([cmp("GT", { shadow: sh.num(0), block: listLen("lbScores") }, { shadow: sh.num(50) })], [
-      [
-        block("array_pop_statement", value("list", sh.num(0), vget("lbScores"))),
-        setVarExpr("nameArr", sh.text(""), stringSplit(vget("lbNames"), ",")),
-        block("array_pop_statement", value("list", sh.num(0), vget("nameArr"))),
-        setVar("tmpStr", sh.text("")),
-        setVarBool("first", "TRUE"),
-        forOfList("nm", vget("nameArr"), [
-          ifStmt([vget("first")], [
-            [
-              setVarExpr("tmpStr", sh.text(""), vget("nm")),
-              setVarBool("first", "FALSE"),
-            ],
-          ], [
-            [setVarExpr("tmpStr", sh.text(""), textJoinBB(vget("tmpStr"), textJoinBB(sh.text(","), vget("nm"))))],
-          ]),
-        ]),
-        setVarExpr("lbNames", sh.text(""), vget("tmpStr")),
-      ],
-    ]),
-    setVarExpr("myRank", sh.num(0), listLen("lbScores")),
-    setVarNum("cIdx", 0),
-    forOfList("nm2", vget("lbScores"), [
-      ifStmt([and(cmp("GTE", { shadow: sh.num(0), block: vget("myScore") }, { shadow: sh.num(0), block: vget("nm2") }), cmp("EQ", { shadow: sh.num(0), block: vget("myRank") }, { shadow: sh.num(0), block: listLen("lbScores") }))], [
-        [setVarExpr("myRank", sh.num(0), arith("ADD", { shadow: sh.num(0), block: vget("cIdx") }, { shadow: sh.num(1) }))],
-      ]),
-      changeVar("cIdx", 1),
-    ]),
-    ...(NO_SETTINGS ? [] : [
-      settingsWriteNumberArray("lbScores"),
-      settingsWriteString("lbNames", vget("tmpStr")),
-    ]),
-  ], 0, 8000)
-);
 
 // ---------- SCORE TICK (forever) ----------
 topBlocks.push(
@@ -797,13 +650,14 @@ topBlocks.push(
           [
             setVarExpr("myName", sh.text(""), textJoinBB(listGet("letters", listGet("slots", sh.num(0))), textJoinBB(listGet("letters", listGet("slots", sh.num(1))), listGet("letters", listGet("slots", sh.num(2)))))),
             setVarBool("entryMode", "FALSE"),
-            forOfList("nm", vget("entrySprites"), [
-              [destroy(vget("nm"))],
+            forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("eCount") }, { shadow: sh.num(1) }), [
+              [destroy(listGet("entrySprites", vget("i")))],
             ]),
-            forOfList("nm", vget("boardRows"), [
-              [destroy(vget("nm"))],
+            forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("rCount") }, { shadow: sh.num(1) }), [
+              [destroy(listGet("boardRows", vget("i")))],
             ]),
-            setVarExpr("boardRows", sh.num(0), emptyList()),
+            setVarNum("eCount", 0),
+            setVarNum("rCount", 0),
             setVarBool("started", "TRUE"),
           ],
         ]),
@@ -839,7 +693,11 @@ topBlocks.push(
       ifStmt([vget("started")], [
         [
           functionCall("lb_submit", "F_lbsub"),
-          setGameOverMessage(textJoin("DONE!  RANK #", vget("myRank")), "true"),
+          ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("myRank") }, { shadow: sh.num(0) })], [
+            [setGameOverMessage(textJoin("DONE!  RANK #", vget("myRank")), "true")],
+          ], [
+            [setGameOverMessage("DONE!  NOT ON BOARD", "true")],
+          ]),
           setGameOverEffect("effects.confetti", "true"),
           gameOver2("true"),
         ],
@@ -1052,6 +910,149 @@ topBlocks.push(
     ],
     2600, 700
   )
+);
+
+// ---------- LEADERBOARD FUNCTION DEFINITIONS ----------
+// Kept at the END of the top-block document order: the Blockly XML loader
+// aborts at the first unknown block type and drops every later block, so any
+// extension-dependent code must not sit in front of proven game code.
+// Boards are fixed 50-slot lists; only lists_index_get/set are used (push /
+// pop / split do not exist as core Arcade blocks).
+
+// F_eshow: name entry UI (top half) — rebuilt on every restart
+topBlocks.push(
+  functionDef("lb_entry_show", "F_eshow", [
+    forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("eCount") }, { shadow: sh.num(1) }), [
+      [destroy(listGet("entrySprites", vget("i")))],
+    ]),
+    forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("rCount") }, { shadow: sh.num(1) }), [
+      [destroy(listGet("boardRows", vget("i")))],
+    ]),
+    setVarNum("eCount", 0),
+    setVarNum("rCount", 0),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("T-REX RUN!"))),
+    setPos(vget("temp"), 80, 7),
+    tsSetFont(vget("temp"), 8),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("ENTER NAME"))),
+    setPos(vget("temp"), 80, 18),
+    tsSetFont(vget("temp"), 6),
+    forLoop("i", sh.whole(2), [
+      setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("A"))),
+      tsSetFont(vget("temp"), 8),
+      setPos(vget("temp"), arith("ADD", { shadow: sh.num(68) }, { shadow: sh.num(12), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(12) }) }), 28),
+      listSet("entrySprites", vget("eCount"), vget("temp")),
+      changeVar("eCount", 1),
+    ]),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("^"))),
+    setPos(vget("temp"), 68, 35),
+    tsSetFont(vget("temp"), 6),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("UP/DOWN LETTER  A=OK  B=BACK"))),
+    setPos(vget("temp"), 80, 42),
+    tsSetFont(vget("temp"), 4),
+    setVarExpr("temp", sh.num(0), textSpriteCreate(sh.text("TOP SCORES"))),
+    setPos(vget("temp"), 80, 54),
+    tsSetFont(vget("temp"), 5),
+  ], 0, 6600)
+);
+
+// F_bshow: render 10 leaderboard rows for the current page (top 50 across 5 pages)
+topBlocks.push(
+  functionDef("lb_board_show", "F_bshow", [
+    forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("rCount") }, { shadow: sh.num(1) }), [
+      [destroy(listGet("boardRows", vget("i")))],
+    ]),
+    setVarNum("rCount", 0),
+    forLoop("i", sh.whole(9), [
+      setVarExpr("bIdx", sh.num(0), arith("ADD", { shadow: sh.num(0), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("page") }, { shadow: sh.num(10) }) }, { shadow: sh.num(0), block: vget("i") })),
+      ifStmt([and(
+        cmp("LT", side(vget("bIdx")), side(vget("lbCount"))),
+        cmp("GT", { shadow: sh.num(0), block: listGet("lbScores", vget("bIdx")) }, { shadow: sh.num(0) })
+      )], [
+        [
+          setVarExpr("temp", sh.num(0), textSpriteCreate(
+            textJoinBB(
+              textJoinBB(textJoinBB(arith("ADD", { shadow: sh.num(0), block: vget("bIdx") }, { shadow: sh.num(1) }), sh.text(". ")), listGet("nameArr", vget("bIdx"))),
+              textJoinBB(sh.text(" "), listGet("lbScores", vget("bIdx")))
+            ))),
+          tsSetFont(vget("temp"), 6),
+          setPos(vget("temp"), 80, arith("ADD", { shadow: sh.num(62) }, { shadow: sh.num(6), block: arith("MULTIPLY", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(6) }) })),
+          listSet("boardRows", vget("rCount"), vget("temp")),
+          changeVar("rCount", 1),
+        ],
+      ]),
+    ]),
+  ], 0, 7300)
+);
+
+// F_lbsub: insert myScore/myName into the fixed-slot top-50 (sorted desc),
+// rank = insert position + 1. Scores of 0 are ignored.
+topBlocks.push(
+  functionDef("lb_submit", "F_lbsub", [
+    setVarExpr("myScore", sh.num(0), scoreReporter()),
+    ifStmt([cmp("GT", side(vget("myScore")), { shadow: sh.num(0) })], [
+      [
+        setVarBool("first", "FALSE"),
+        setVarExpr("insIdx", sh.num(0), vget("lbCount")),
+        forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("lbCount") }, { shadow: sh.num(1) }), [
+          [ifStmt([and(not(vget("first")), cmp("GT", side(vget("myScore")), { shadow: sh.num(0), block: listGet("lbScores", vget("i")) }))], [
+            [
+              setVarExpr("insIdx", sh.num(0), vget("i")),
+              setVarBool("first", "TRUE"),
+            ],
+          ])],
+        ]),
+        ifStmt([or(vget("first"), cmp("LT", side(vget("lbCount")), { shadow: sh.num(50) }))], [
+          [
+            setVarExpr("lastI", sh.num(0), constrain(vget("lbCount"), 0, 49)),
+            forLoop("cIdx", arith("MINUS", { shadow: sh.num(0), block: arith("MINUS", { shadow: sh.num(0), block: vget("lastI") }, { shadow: sh.num(0), block: vget("insIdx") }) }, { shadow: sh.num(1) }), [
+              [
+                setVarExpr("i", sh.num(0), arith("MINUS", { shadow: sh.num(0), block: arith("MINUS", { shadow: sh.num(0), block: vget("lastI") }, { shadow: sh.num(0), block: vget("cIdx") }) }, { shadow: sh.num(1) })),
+                listSet("lbScores", arith("ADD", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(1) }), listGet("lbScores", vget("i"))),
+                listSet("nameArr", arith("ADD", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(1) }), listGet("nameArr", vget("i"))),
+              ],
+            ]),
+            listSet("lbScores", vget("insIdx"), vget("myScore")),
+            listSet("nameArr", vget("insIdx"), vget("myName")),
+            ifStmt([cmp("LT", side(vget("lbCount")), { shadow: sh.num(50) })], [
+              [changeVar("lbCount", 1)],
+            ]),
+            setVarExpr("myRank", sh.num(0), arith("ADD", { shadow: sh.num(0), block: vget("insIdx") }, { shadow: sh.num(1) })),
+            ...(NO_SETTINGS ? [] : [functionCall("lb_settings_save", "F_lbsave")]),
+          ],
+        ]),
+      ],
+    ]),
+  ], 2600, 1400)
+);
+
+// F_lbload / F_lbsave: settings persistence (settings build only). Names are
+// stored as one settings string per slot ("lbN0".."lbN49") because Arcade
+// blocks have no string split.
+topBlocks.push(
+  functionDef("lb_settings_load", "F_lbload", [
+    ifStmt([settingsExists("lbScores")], [
+      [
+        setVarExpr("lbScores", sh.num(0), settingsReadNumberArray("lbScores")),
+        forLoop("i", sh.whole(49), [
+          [listSet("nameArr", vget("i"), settingsReadString(textJoin("lbN", vget("i"))))],
+        ]),
+        setVarNum("lbCount", 0),
+        forLoop("i", sh.whole(49), [
+          [ifStmt([cmp("GT", { shadow: sh.num(0), block: listGet("lbScores", vget("i")) }, { shadow: sh.num(0) })], [
+            [setVarExpr("lbCount", sh.num(0), arith("ADD", { shadow: sh.num(0), block: vget("i") }, { shadow: sh.num(1) }))],
+          ])],
+        ]),
+      ],
+    ]),
+  ], 2600, 1700)
+);
+topBlocks.push(
+  functionDef("lb_settings_save", "F_lbsave", [
+    settingsWriteNumberArray("lbScores"),
+    forLoop("i", sh.whole(49), [
+      [settingsWriteString(textJoin("lbN", vget("i")), listGet("nameArr", vget("i")))],
+    ]),
+  ], 2600, 2000)
 );
 
 // ---------------- assemble XML ----------------

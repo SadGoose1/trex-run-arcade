@@ -1,0 +1,17 @@
+{
+    "name": "T-Rex Run",
+    "description": "A Chrome-style dinosaur endless runner built entirely with MakeCode Arcade block code.",
+    "dependencies": {
+        "device": "*"
+    },
+    "files": [
+        "main.blocks",
+        "main.ts",
+        "README.md",
+        "assets.json"
+    ],
+    "supportedTargets": [
+        "arcade"
+    ],
+    "preferredEditor": "blocksprj"
+}
