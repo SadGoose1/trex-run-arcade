@@ -4,7 +4,17 @@
 // in the Blocks editor.
 const fs = require("fs");
 const path = require("path");
-const S = require("./sprites.js");
+// Sprite art: HQ versions generated from the user-provided images
+// (dino, 3 trees, sun, moon, 9 clouds, bird, plus cactus/star/heart/bolt/ground).
+// Chars map to the Arcade 16-color palette (0=transparent,1=white,2=red,3=pink,
+// 4=orange,5=yellow,6=teal,7=green,8=blue,9=cyan,a=purple,b=mauve,
+// c=dark purple,d=pale,e=brown,f=black).
+const S = require("./hq/sprites_hq.js");
+// Compatibility: HQ ships sprite VARIANTS (tree/cloud1-9, bird1/bird2).
+// Pick randomly at spawn time so all 3 trees, all 9 clouds, and both
+// bird poses appear in the game.
+const treeVar = () => [S.tree1, S.tree2, S.tree3][Math.floor(Math.random() * 3)];
+const cloudVar = () => [S.cloud1, S.cloud2, S.cloud3, S.cloud4, S.cloud5, S.cloud6, S.cloud7, S.cloud8, S.cloud9][Math.floor(Math.random() * 9)];
 
 const SCORE_STEP = process.env.FASTSCORE ? 25 : 1;
 const NO_SETTINGS = !!process.env.NO_SETTINGS;
@@ -395,7 +405,7 @@ const topBlocks = [];
 // ---------- ON START ----------
 const NO_SPLASH = !!process.env.NO_SPLASH;
 const startStmts = [
-  setBackgroundColor(14),
+  setBackgroundColor(9),
   ...(NO_SPLASH ? [setVarBool("started", "TRUE")] : []),
 ];
 topBlocks.push(
@@ -578,11 +588,11 @@ tick.push(worldMove("Cloud", 2, 0, 3300));
 // day / night cycle every 150 points: the sun and moon swap places (both are
 // stationary Projectile-kind sprites so they hang in the sky)
 tick.push(setVar("phase", modulo(scoreReporter(), 300)));
-tick.push(
-  ifStmt([and(not(vget("nightMode")), cmp("GTE", { shadow: sh.num(0), block: vget("phase") }, { shadow: sh.num(150) }))], [
-    [
-      setBackgroundColor(1),
-      setVarBool("nightMode", "TRUE"),
+  tick.push(
+    ifStmt([and(not(vget("nightMode")), cmp("GTE", { shadow: sh.num(0), block: vget("phase") }, { shadow: sh.num(150) }))], [
+      [
+        setBackgroundColor(15),
+        setVarBool("nightMode", "TRUE"),
       destroy(vget("sunSpr")),
       setVar("moonSpr", createSprite(S.moon, "Projectile")),
       setPos(vget("moonSpr"), 128, 26),
@@ -592,7 +602,7 @@ tick.push(
 tick.push(
   ifStmt([and(vget("nightMode"), cmp("LT", { shadow: sh.num(0), block: vget("phase") }, { shadow: sh.num(150) }))], [
     [
-      setBackgroundColor(14),
+      setBackgroundColor(9),
       setVarBool("nightMode", "FALSE"),
       destroy(vget("moonSpr")),
       setVar("sunSpr", createSprite(S.sun, "Projectile")),
@@ -629,13 +639,13 @@ if (!process.env.NO_OBSTACLES) topBlocks.push(
               ]),
             ],
             [
-              setVar("temp", createSprite(S.tree, "Enemy")),
+              setVar("temp", createSprite(treeVar(), "Enemy")),
               setPos(vget("temp"), 168, 90),
               setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
               setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
               ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("stage") }, { shadow: sh.num(2) })], [
                 [
-                  setVar("temp", createSprite(S.tree, "Enemy")),
+                  setVar("temp", createSprite(treeVar(), "Enemy")),
                   setPos(vget("temp"), 194, 90),
                   setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
                   setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
@@ -644,16 +654,16 @@ if (!process.env.NO_OBSTACLES) topBlocks.push(
             ],
           ],
           [
-            setVar("temp", createSprite(S.birdWingUp, "Enemy")),
+            setVar("temp", createSprite(S.bird1, "Enemy")),
             setPos(vget("temp"), 168, 88),
-            runAnim(vget("temp"), [S.birdWingUp, S.birdWingDown], 200, "true"),
+            runAnim(vget("temp"), [S.bird1, S.bird2], 200, "true"),
             setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
             setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
             ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("stage") }, { shadow: sh.num(1) })], [
               [
-                setVar("temp", createSprite(S.birdWingDown, "Enemy")),
+                setVar("temp", createSprite(S.bird2, "Enemy")),
                 setPos(vget("temp"), 204, 88),
-                runAnim(vget("temp"), [S.birdWingUp, S.birdWingDown], 200, "true"),
+                runAnim(vget("temp"), [S.bird1, S.bird2], 200, "true"),
                 setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
                 setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
               ],
@@ -706,7 +716,7 @@ topBlocks.push(
   gameInterval(2600, [
     ifStmt([and(vget("started"), block("percentchance", value("percentage", sh.percent(70))))], [
       [
-        setVar("temp", createSprite(S.cloud, "Cloud")),
+        setVar("temp", createSprite(cloudVar(), "Cloud")),
         setPos(vget("temp"), 168, 14),
         setVel(vget("temp"), sh.speed(-50), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(2), block: arith("DIVIDE", { shadow: sh.num(0), block: vget("speed") }, { shadow: sh.num(2) }) }), sh.speed(0)),
         setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
@@ -1077,7 +1087,7 @@ topBlocks.push(
       setPos(vget("dino"), 24, 100),
       setVel(vget("dino"), sh.speed(0), null, sh.speed(0)),
       functionCall("update_dino_image", "F_uddi"),
-      setBackgroundColor(14),
+      setBackgroundColor(9),
       functionCall("lb_entry_show", "F_eshow"),
       functionCall("lb_board_show", "F_bshow"),
     ],
