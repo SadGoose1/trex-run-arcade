@@ -612,7 +612,7 @@ tick.push(
 );
 topBlocks.push(gameInterval(100, tick, 0, 1500));
 
-// ---------- OBSTACLE SPAWNER (every 900ms) ----------
+// ---------- OBSTACLE SPAWNER (every 1200ms) ----------
 if (!process.env.NO_OBSTACLES) topBlocks.push(
   gameInterval(900, [
     ifStmt([vget("started")], [
@@ -655,16 +655,16 @@ if (!process.env.NO_OBSTACLES) topBlocks.push(
           ],
           [
             setVar("temp", createSprite(S.bird1, "Enemy")),
-            setPos(vget("temp"), 168, 88),
+            setPos(vget("temp"), 168, 64),
             runAnim(vget("temp"), [S.bird1, S.bird2], 200, "true"),
-            setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
+            setVel(vget("temp"), sh.speed(-40), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: arith("DIVIDE", { shadow: sh.num(0), block: vget("speed") }, { shadow: sh.num(2) }) }), sh.speed(0)),
             setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
             ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("stage") }, { shadow: sh.num(1) })], [
               [
                 setVar("temp", createSprite(S.bird2, "Enemy")),
-                setPos(vget("temp"), 204, 88),
+                setPos(vget("temp"), 204, 64),
                 runAnim(vget("temp"), [S.bird1, S.bird2], 200, "true"),
-                setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
+                setVel(vget("temp"), sh.speed(-40), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }, { shadow: sh.num(2) }), sh.speed(0)),
                 setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
               ],
             ]),
