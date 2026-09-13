@@ -242,6 +242,10 @@ function not(x) {
 function arith(op, aSide, bSide) {
   return block("math_arithmetic", `<field name="OP">${op}</field>` + value("A", aSide.shadow, aSide.block) + value("B", bSide.shadow, bSide.block));
 }
+function randXPos() {
+  // randomly x=168 or x=204 (same two lanes as trees/birds)
+  return arith("ADD", { shadow: sh.num(168) }, { shadow: sh.num(0), block: arith("MULTIPLY", { shadow: sh.num(36) }, { shadow: sh.num(0), block: random(0, 1) }) });
+}
 function constrain(v, low, high) {
   return block("math_constrain_value", value("value", sh.num(50), v) + value("low", sh.num(low)) + value("high", sh.num(high)));
 }
@@ -614,7 +618,7 @@ topBlocks.push(gameInterval(100, tick, 0, 1500));
 
 // ---------- OBSTACLE SPAWNER (every 1200ms) ----------
 if (!process.env.NO_OBSTACLES) topBlocks.push(
-  gameInterval(900, [
+  gameInterval(1200, [
     ifStmt([vget("started")], [
       [
         setVar("pick", random(1, 10)),
@@ -657,14 +661,14 @@ if (!process.env.NO_OBSTACLES) topBlocks.push(
             setVar("temp", createSprite(S.bird1, "Enemy")),
             setPos(vget("temp"), 168, 64),
             runAnim(vget("temp"), [S.bird1, S.bird2], 200, "true"),
-            setVel(vget("temp"), sh.speed(-40), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: arith("DIVIDE", { shadow: sh.num(0), block: vget("speed") }, { shadow: sh.num(2) }) }), sh.speed(0)),
+            setVel(vget("temp"), sh.speed(-30), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: arith("DIVIDE", { shadow: sh.num(0), block: vget("speed") }, { shadow: sh.num(2) }) }), sh.speed(0)),
             setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
             ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("stage") }, { shadow: sh.num(1) })], [
               [
                 setVar("temp", createSprite(S.bird2, "Enemy")),
                 setPos(vget("temp"), 204, 64),
                 runAnim(vget("temp"), [S.bird1, S.bird2], 200, "true"),
-                setVel(vget("temp"), sh.speed(-40), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }, { shadow: sh.num(2) }), sh.speed(0)),
+                setVel(vget("temp"), sh.speed(-30), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: arith("DIVIDE", { shadow: sh.num(0), block: vget("speed") }, { shadow: sh.num(2) }) }), sh.speed(0)),
                 setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
               ],
             ]),
@@ -686,20 +690,20 @@ if (!process.env.NO_POWERUPS) topBlocks.push(
           [
             [
               setVar("temp", createSprite(S.starPow, "Star")),
-              setPos(vget("temp"), 168, 40, random(40, 88)),
+              setPos(vget("temp"), 168, 40, random(40, 88), randXPos()),
               setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
               setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
             ],
             [
               setVar("temp", createSprite(S.heart, "Heart")),
-              setPos(vget("temp"), 168, 40, random(40, 88)),
+              setPos(vget("temp"), 168, 40, random(40, 88), randXPos()),
               setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
               setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
             ],
           ],
           [
             setVar("temp", createSprite(S.bolt, "Bolt")),
-            setPos(vget("temp"), 168, 40, random(40, 88)),
+            setPos(vget("temp"), 168, 40, random(40, 88), randXPos()),
             setVel(vget("temp"), sh.speed(-100), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: vget("speed") }), sh.speed(0)),
             setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
           ]
@@ -717,7 +721,7 @@ topBlocks.push(
     ifStmt([and(vget("started"), block("percentchance", value("percentage", sh.percent(70))))], [
       [
         setVar("temp", createSprite(cloudVar(), "Cloud")),
-        setPos(vget("temp"), 168, 14),
+        setPos(vget("temp"), 168, 14, random(10, 22)),
         setVel(vget("temp"), sh.speed(-50), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(2), block: arith("DIVIDE", { shadow: sh.num(0), block: vget("speed") }, { shadow: sh.num(2) }) }), sh.speed(0)),
         setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
       ],
