@@ -22,7 +22,7 @@ let idc = 0;
 const nid = () => "blk" + (++idc);
 
 // ---------------- variables registry ----------------
-const kindVars = ["Player", "Projectile", "Enemy", "Star", "Heart", "Bolt", "Cloud"];
+const kindVars = ["Player", "Projectile", "Enemy", "Bird", "Star", "Heart", "Bolt", "Cloud"];
 const plainVars = ["dino", "temp", "ts", "pick", "r2", "speed", "effSpeed", "vy", "gravity", "jumpHeld", "stage", "grounded", "ducking", "started", "starMs", "hitInvMs", "slowMs", "nightMode", "blinkOn", "phase", "nameI", "charI", "entryMode", "overMode", "page", "myRank", "myScore", "myName", "lbScores", "nameArr", "lbCount", "lastI", "ok", "tmpS", "tmpN", "vol", "volSpr", "sunSpr", "moonSpr", "letters", "entrySprites", "boardRows", "eCount", "rCount", "idx", "slots", "first", "cIdx", "nm", "nm2", "i", "a", "pass", "bIdx", "selftestPhase"];
 const varId = {};
 kindVars.forEach((k) => (varId[k] = "kind_" + k.toLowerCase()));
@@ -388,6 +388,11 @@ function setGameOverMessageBlock(msgBlock, win) {
 function setGameOverEffect(effect, win) {
   return block("game_setgameovereffect", `<field name="effect">${effect}</field>` + value("win", sh.winlose(win)));
 }
+// screen effects live in pxt-common-packages libs/game (no extension needed);
+// the effect is a FIELD, not a value: <field name="effect">effects.confetti</field>
+function confetti() {
+  return block("particlesStartScreenAnimation", `<mutation xmlns="http://www.w3.org/1999/xhtml" _expanded="0" _input_init="false"></mutation><field name="effect">effects.confetti</field>`);
+}
 function gameOver2(win) {
   return block("gameOver2", value("win", sh.winlose(win)));
 }
@@ -497,7 +502,7 @@ if (process.env.SELFTEST) {
   );
   topBlocks.push(
     foreverLoop([
-      block("device_pause", value("pause", sh.time(60000))),
+      block("device_pause", value("pause", sh.time(parseInt(process.env.SELFTEST_START_MS, 10) || 60000))),
       ifStmt([cmp("EQ", { shadow: sh.num(0), block: vget("selftestPhase") }, { shadow: sh.num(1) })], [
         [
           forLoop("i", arith("MINUS", { shadow: sh.num(0), block: vget("eCount") }, { shadow: sh.num(1) }), [
@@ -585,6 +590,9 @@ tick.push(
 );
 // sweep world sprite velocities
 tick.push(worldMove("Enemy", 1, 0, 2500));
+// birds glide at half world speed (their own kind, so the Enemy sweep
+// can't snap them back to full speed)
+tick.push(worldMove("Bird", 2, 0, 2450));
 tick.push(worldMove("Star", 1, 0, 2700));
 tick.push(worldMove("Heart", 1, 0, 2900));
 tick.push(worldMove("Bolt", 1, 0, 3100));
@@ -658,14 +666,16 @@ if (!process.env.NO_OBSTACLES) topBlocks.push(
             ],
           ],
           [
-            setVar("temp", createSprite(S.bird1, "Enemy")),
+            // birds are their own kind: the Enemy sweep forces full speed on
+            // everything in it, which would cancel the slower flight below
+            setVar("temp", createSprite(S.bird1, "Bird")),
             setPos(vget("temp"), 168, 64),
             runAnim(vget("temp"), [S.bird1, S.bird2], 200, "true"),
             setVel(vget("temp"), sh.speed(-30), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: arith("DIVIDE", { shadow: sh.num(0), block: vget("speed") }, { shadow: sh.num(2) }) }), sh.speed(0)),
             setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
             ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("stage") }, { shadow: sh.num(1) })], [
               [
-                setVar("temp", createSprite(S.bird2, "Enemy")),
+                setVar("temp", createSprite(S.bird2, "Bird")),
                 setPos(vget("temp"), 204, 64),
                 runAnim(vget("temp"), [S.bird1, S.bird2], 200, "true"),
                 setVel(vget("temp"), sh.speed(-30), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: arith("DIVIDE", { shadow: sh.num(0), block: vget("speed") }, { shadow: sh.num(2) }) }), sh.speed(0)),
@@ -756,8 +766,12 @@ topBlocks.push(
               setVarBool("started", "TRUE"),
             ],
           ], [
-            // not done yet: slide the caret under the next slot
-            [caretMove()],
+            // not done yet: sync the cycle letter to the next slot's
+            // pre-filled letter, then slide the caret under it (without this,
+            // charI carried over from the previous slot — picking B then A,A
+            // filed BBB)
+            setVarExpr("charI", sh.num(0), listGet("slots", vget("nameI"))),
+            caretMove(),
           ]),
         ],
       ], [
@@ -802,6 +816,14 @@ topBlocks.push(
             functionCall("lb_submit", "F_lbsub"),
             setVarBool("overMode", "TRUE"),
             setVarBool("started", "FALSE"),
+            // clear whatever is still in flight: obstacles keep drifting
+            // otherwise and could hit the idle dino after the run has ended
+            destroyAllOfKind("Enemy"),
+            destroyAllOfKind("Bird"),
+            destroyAllOfKind("Star"),
+            destroyAllOfKind("Heart"),
+            destroyAllOfKind("Bolt"),
+            destroyAllOfKind("Cloud"),
             ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("myRank") }, { shadow: sh.num(0) })], [
               [
                 setVar("ts", textSpriteCreate(textJoin("DONE!  RANK #", vget("myRank")))),
@@ -951,50 +973,96 @@ topBlocks.push(
 );
 
 // ---------- COLLISION: PLAYER vs ENEMY ----------
+// every overlap body is gated on started: leftover sprites after a run ends
+// (or a stray event during entry/over screens) must never drain lives or
+// double-submit the score
 topBlocks.push(
   spritesOverlap("Player", "Enemy", [
-    ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("starMs") }, { shadow: sh.num(0) })], [
+    ifStmt([vget("started")], [
       [
-        destroy(other()),
-        changeScore(50),
-        playMusic("G5 C6 ", 400, "music.PlaybackMode.InBackground"),
+        ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("starMs") }, { shadow: sh.num(0) })], [
+          [
+            destroy(other()),
+            changeScore(50),
+            playMusic("G5 C6 ", 400, "music.PlaybackMode.InBackground"),
+          ],
+        ], [
+          ifStmt([cmp("LTE", { shadow: sh.num(0), block: vget("hitInvMs") }, { shadow: sh.num(0) })], [
+            [
+              changeLife(-1),
+              destroy(other()),
+              setVarNum("hitInvMs", 1500),
+              setVarBool("blinkOn", "TRUE"),
+              setFlag(vget("dino"), "SpriteFlag.Invisible", sh.toggle("true")),
+              playMusic("E3 C3 ", 300, "music.PlaybackMode.InBackground"),
+            ],
+          ]),
+        ]),
       ],
-    ], [
-      ifStmt([cmp("LTE", { shadow: sh.num(0), block: vget("hitInvMs") }, { shadow: sh.num(0) })], [
-        [
-          changeLife(-1),
-          destroy(other()),
-          setVarNum("hitInvMs", 1500),
-          setVarBool("blinkOn", "TRUE"),
-          setFlag(vget("dino"), "SpriteFlag.Invisible", sh.toggle("true")),
-          playMusic("E3 C3 ", 300, "music.PlaybackMode.InBackground"),
-        ],
-      ]),
     ]),
   ], 1800, 0)
+);
+// birds fly at half speed but hit just as hard — same damage rules as Enemy
+topBlocks.push(
+  spritesOverlap("Player", "Bird", [
+    ifStmt([vget("started")], [
+      [
+        ifStmt([cmp("GT", { shadow: sh.num(0), block: vget("starMs") }, { shadow: sh.num(0) })], [
+          [
+            destroy(other()),
+            changeScore(50),
+            playMusic("G5 C6 ", 400, "music.PlaybackMode.InBackground"),
+          ],
+        ], [
+          ifStmt([cmp("LTE", { shadow: sh.num(0), block: vget("hitInvMs") }, { shadow: sh.num(0) })], [
+            [
+              changeLife(-1),
+              destroy(other()),
+              setVarNum("hitInvMs", 1500),
+              setVarBool("blinkOn", "TRUE"),
+              setFlag(vget("dino"), "SpriteFlag.Invisible", sh.toggle("true")),
+              playMusic("E3 C3 ", 300, "music.PlaybackMode.InBackground"),
+            ],
+          ]),
+        ]),
+      ],
+    ]),
+  ], 1800, 250)
 );
 
 // ---------- POWER-UP PICKUPS ----------
 topBlocks.push(
   spritesOverlap("Player", "Star", [
-    setVarNum("starMs", 5000),
-    destroy(other()),
-    playMusic("C5 E5 G5 C6 ", 400, "music.PlaybackMode.InBackground"),
-    functionCall("update_dino_image", "F_uddi"),
+    ifStmt([vget("started")], [
+      [
+        setVarNum("starMs", 5000),
+        destroy(other()),
+        playMusic("C5 E5 G5 C6 ", 400, "music.PlaybackMode.InBackground"),
+        functionCall("update_dino_image", "F_uddi"),
+      ],
+    ]),
   ], 1800, 500)
 );
 topBlocks.push(
   spritesOverlap("Player", "Heart", [
-    ifStmt([cmp("LT", { shadow: sh.num(0), block: lifeReporter() }, { shadow: sh.num(5) })], [[changeLife(1)]]),
-    destroy(other()),
-    playMusic("C5 E5 G5 C6 ", 400, "music.PlaybackMode.InBackground"),
+    ifStmt([vget("started")], [
+      [
+        ifStmt([cmp("LT", { shadow: sh.num(0), block: lifeReporter() }, { shadow: sh.num(5) })], [[changeLife(1)]]),
+        destroy(other()),
+        playMusic("C5 E5 G5 C6 ", 400, "music.PlaybackMode.InBackground"),
+      ],
+    ]),
   ], 1800, 800)
 );
 topBlocks.push(
   spritesOverlap("Player", "Bolt", [
-    setVarNum("slowMs", 5000),
-    destroy(other()),
-    playMusic("G5 E5 C5 ", 400, "music.PlaybackMode.InBackground"),
+    ifStmt([vget("started")], [
+      [
+        setVarNum("slowMs", 5000),
+        destroy(other()),
+        playMusic("G5 E5 C5 ", 400, "music.PlaybackMode.InBackground"),
+      ],
+    ]),
   ], 1800, 1100)
 );
 
@@ -1013,6 +1081,7 @@ topBlocks.push(
     setVel(vget("dino"), sh.speed(0), null, sh.speed(0)),
     setFlag(vget("dino"), "SpriteFlag.Invisible", sh.toggle("false")),
     destroyAllOfKind("Enemy"),
+    destroyAllOfKind("Bird"),
     destroyAllOfKind("Star"),
     destroyAllOfKind("Heart"),
     destroyAllOfKind("Bolt"),
@@ -1085,8 +1154,18 @@ topBlocks.push(
       setVarNum("starMs", 0),
       setVarNum("hitInvMs", 0),
       setVarNum("slowMs", 0),
-      setVarBool("nightMode", "FALSE"),
       setVarBool("blinkOn", "FALSE"),
+      // a run that ended at night leaves the moon up: swap it back to the sun
+      // so the entry screen is a clean day scene and the next nightfall can't
+      // spawn a second moon next to the leftover one
+      ifStmt([vget("nightMode")], [
+        [
+          destroy(vget("moonSpr")),
+          setVar("sunSpr", createSprite(S.sun, "Projectile")),
+          setPos(vget("sunSpr"), 138, 30),
+        ],
+      ]),
+      setVarBool("nightMode", "FALSE"),
       setFlag(vget("dino"), "SpriteFlag.Invisible", sh.toggle("false")),
       setPos(vget("dino"), 24, 100),
       setVel(vget("dino"), sh.speed(0), null, sh.speed(0)),
@@ -1190,25 +1269,27 @@ topBlocks.push(
   ], 0, 7300)
 );
 
-// F_lbsub: insert myScore/myName into the fixed-slot top-50 (sorted desc).
+// F_lbsub: insert myScore/myName into the fixed-slot top-5 (sorted desc).
 // Insert at the end slot, then bubble down with one full adjacent-swap pass —
 // every statement mirrors a decompile-proven shape (see loader pitfalls).
-// Scores of 0 are ignored.
+// Scores of 0 are ignored (and clear a stale rank so an instant B-quit can't
+// show the previous run's "RANK #N").
 topBlocks.push(
   functionDef("lb_submit", "F_lbsub", [
+    setVarNum("myRank", 0),
     setVarExpr("myScore", sh.num(0), scoreReporter()),
     ifStmt([cmp("GT", side(vget("myScore")), { shadow: sh.num(0) })], [
       [
         // qualifies: board not full, or beats the current lowest entry
         setVarExpr("ok", sh.bool("FALSE"), block("logic_operation", `<field name="OP">OR</field>` +
-          value("A", sh.bool("TRUE"), cmp("LT", side(vget("lbCount")), { shadow: sh.num(50) })) +
+          value("A", sh.bool("TRUE"), cmp("LT", side(vget("lbCount")), { shadow: sh.num(5) })) +
           value("B", sh.bool("TRUE"), cmp("GT", side(vget("myScore")), { shadow: sh.num(0), block: listGet("lbScores", sh.num(4)) })))),
         ifStmt([vget("ok")], [
           [
             setVarExpr("lastI", sh.num(0), constrain(vget("lbCount"), 0, 4)),
             listSet("lbScores", vget("lastI"), vget("myScore")),
             listSet("nameArr", vget("lastI"), vget("myName")),
-            ifStmt([cmp("LT", side(vget("lbCount")), { shadow: sh.num(50) })], [
+            ifStmt([cmp("LT", side(vget("lbCount")), { shadow: sh.num(5) })], [
               [changeVar("lbCount", 1)],
             ]),
             // full bubble sort (49 passes): one pass moves the new entry up
@@ -1278,6 +1359,48 @@ if (!NO_SETTINGS) {
     ], 2600, 2000)
   );
 }
+
+// ---------- WIN at 500: champion screen (kept LAST in document order — the
+// loader aborts at the first block type it can't resolve, and only this
+// handler uses particlesStartScreenAnimation) ----------
+// game.onScore fires on every crossing of 500, including DOWNWARD when
+// restart_run resets the score to 0 — the guard ignores that re-fire.
+topBlocks.push(
+  onScore(500, [
+    ifStmt([and(vget("started"), not(vget("overMode")))], [
+      [
+        // celebrate on a clean scene: clear the mercy-blink, sweep the world
+        setFlag(vget("dino"), "SpriteFlag.Invisible", sh.toggle("false")),
+        destroyAllOfKind("Enemy"),
+        destroyAllOfKind("Bird"),
+        destroyAllOfKind("Star"),
+        destroyAllOfKind("Heart"),
+        destroyAllOfKind("Bolt"),
+        destroyAllOfKind("Cloud"),
+        functionCall("lb_submit", "F_lbsub"),
+        setVarBool("overMode", "TRUE"),
+        setVarBool("started", "FALSE"),
+        confetti(),
+        playMusic("C5 E5 G5 C6 ", 400, "music.PlaybackMode.InBackground"),
+        setVar("ts", textSpriteCreate(sh.text("YOU WIN!"))),
+        tsSetFont(vget("ts"), 8),
+        setPos(vget("ts"), 80, 25),
+        listSet("entrySprites", vget("eCount"), vget("ts")),
+        changeVar("eCount", 1),
+        setVar("ts", textSpriteCreate(textJoin("SCORE ", scoreReporter()))),
+        tsSetFont(vget("ts"), 5),
+        setPos(vget("ts"), 80, 44),
+        listSet("entrySprites", vget("eCount"), vget("ts")),
+        changeVar("eCount", 1),
+        setVar("ts", textSpriteCreate(sh.text("PRESS A"))),
+        tsSetFont(vget("ts"), 4),
+        setPos(vget("ts"), 80, 58),
+        listSet("entrySprites", vget("eCount"), vget("ts")),
+        changeVar("eCount", 1),
+      ],
+    ]),
+  ], 2900, 2300)
+);
 
 // ---------------- assemble XML ----------------
 let vars = "<variables>";
