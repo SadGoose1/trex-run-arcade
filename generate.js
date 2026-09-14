@@ -669,14 +669,14 @@ if (!process.env.NO_OBSTACLES) topBlocks.push(
             // birds are their own kind: the Enemy sweep forces full speed on
             // everything in it, which would cancel the slower flight below
             setVar("temp", createSprite(S.bird1, "Bird")),
-            setPos(vget("temp"), 168, 64),
+            setPos(vget("temp"), 168, 72),
             runAnim(vget("temp"), [S.bird1, S.bird2], 200, "true"),
             setVel(vget("temp"), sh.speed(-30), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: arith("DIVIDE", { shadow: sh.num(0), block: vget("speed") }, { shadow: sh.num(2) }) }), sh.speed(0)),
             setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
             ifStmt([cmp("GTE", { shadow: sh.num(0), block: vget("stage") }, { shadow: sh.num(1) })], [
               [
                 setVar("temp", createSprite(S.bird2, "Bird")),
-                setPos(vget("temp"), 204, 64),
+                setPos(vget("temp"), 204, 72),
                 runAnim(vget("temp"), [S.bird1, S.bird2], 200, "true"),
                 setVel(vget("temp"), sh.speed(-30), arith("MINUS", { shadow: sh.num(0) }, { shadow: sh.num(0), block: arith("DIVIDE", { shadow: sh.num(0), block: vget("speed") }, { shadow: sh.num(2) }) }), sh.speed(0)),
                 setFlag(vget("temp"), "SpriteFlag.AutoDestroy", sh.toggle("true")),
